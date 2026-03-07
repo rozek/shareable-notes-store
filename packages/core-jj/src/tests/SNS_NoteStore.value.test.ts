@@ -6,7 +6,7 @@
 
 import { describe, it, expect, vi } from 'vitest'
 import { SNS_NoteStore } from '../store/SNS_NoteStore.js'
-import { SNS_Error }     from '../error/SNS_Error.js'
+import { SNS_Error }     from '@rozek/sns-core'
 
 //----------------------------------------------------------------------------//
 //                                   Tests                                    //

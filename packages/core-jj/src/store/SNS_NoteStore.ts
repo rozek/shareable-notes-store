@@ -32,8 +32,7 @@ import {
   DefaultWrapperCacheSize,
 } from './constants.js'
 import { CanonicalEmptySnapshot } from './canonical-empty-snapshot.js'
-import type { SNS_ChangeSet } from '../changeset/SNS_ChangeSet.js'
-import type { SNS_SyncCursor } from '../interfaces/SNS_PersistenceProvider.js'
+import type { SNS_ChangeSet, SNS_SyncCursor } from '@rozek/sns-core'
 
 //----------------------------------------------------------------------------//
 //                                   Types                                    //
@@ -477,7 +476,7 @@ export class SNS_NoteStore {
 
     const Now = Date.now()
     const View = this.#view()
-    const TrashChildren = Array.from(this.#ReverseIndex.get(TrashId) ?? new Set())
+    const TrashChildren = Array.from(this.#ReverseIndex.get(TrashId) ?? new Set<string>())
     let purgedCount = 0
 
     for (const InnerEntryId of TrashChildren) {

@@ -8,7 +8,7 @@ import { describe, it, expect } from 'vitest'
 import { SNS_NoteStore } from '../store/SNS_NoteStore.js'
 import { SNS_Note }      from '../store/SNS_Note.js'
 import { SNS_Link }      from '../store/SNS_Link.js'
-import { SNS_Error }     from '../error/SNS_Error.js'
+import { SNS_Error }     from '@rozek/sns-core'
 
 //----------------------------------------------------------------------------//
 //                                   Tests                                    //
