@@ -27,7 +27,7 @@ pnpm add @rozek/sns-websocket-server
 pnpm add @rozek/sns-websocket-server @rozek/sns-persistence-node better-sqlite3
 ```
 
-`better-sqlite3` and `@rozek/sns-persistence-node` are optional dependencies: the server loads them lazily only when `PersistDir` / `SNS_PERSIST_DIR` is set. In relay-only mode neither package needs to be installed.
+`@rozek/sns-persistence-node` is an optional peer dependency: the server loads it lazily only when `PersistDir` / `SNS_PERSIST_DIR` is set. In relay-only mode neither package needs to be installed.
 
 ---
 

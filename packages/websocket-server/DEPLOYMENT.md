@@ -323,9 +323,19 @@ const { start } = createSNSServer()
 start()
 ```
 
+Configure the server via environment variables (see the [Configuration](#configuration) section for the full reference) and start it:
+
 ```bash
-SNS_JWT_SECRET=your-secret node server.mjs
+export SNS_JWT_SECRET=your-secret-at-least-32-chars   # required
+export SNS_PORT=3000                                   # default: 3000
+export SNS_HOST=127.0.0.1                              # default: 127.0.0.1
+export SNS_ISSUER=https://my-server.example.com        # optional
+# SNS_PERSIST_DIR is intentionally omitted — relay-only mode
+
+node server.mjs
 ```
+
+For a persistent setup (e.g. as a systemd service), write the variables to `/etc/sns-server.env` and reference it with `EnvironmentFile=` rather than hardcoding secrets in the unit file.
 
 No compiler, no build tools, no RAM spike.
 
@@ -338,6 +348,18 @@ npm_config_build_from_source=false npm install @rozek/sns-websocket-server bette
 ```
 
 If no pre-built binary matches your platform, this fails with a clear error instead of silently running `node-gyp` and consuming all available RAM.
+
+Use the same `server.mjs` entry point as in Strategy 1, and add `SNS_PERSIST_DIR` to the environment:
+
+```bash
+export SNS_JWT_SECRET=your-secret-at-least-32-chars
+export SNS_PORT=3000
+export SNS_HOST=127.0.0.1
+export SNS_ISSUER=https://my-server.example.com        # optional
+export SNS_PERSIST_DIR=/var/lib/sns-server/stores      # enables SQLite persistence
+
+node server.mjs
+```
 
 ### Strategy 3 — Build elsewhere, deploy the tarball
 

@@ -336,13 +336,13 @@ importers:
         specifier: ^5.0.0
         version: 5.10.0
     optionalDependencies:
-      '@rozek/sns-persistence-node':
-        specifier: workspace:*
-        version: link:../persistence-node
       better-sqlite3:
         specifier: ^9.0.0
         version: 9.6.0
     devDependencies:
+      '@rozek/sns-persistence-node':
+        specifier: workspace:*
+        version: link:../persistence-node
       '@types/better-sqlite3':
         specifier: ^7.6.0
         version: 7.6.13

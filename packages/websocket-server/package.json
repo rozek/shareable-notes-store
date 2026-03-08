@@ -43,11 +43,19 @@
     "hono": "^4.0.0",
     "jose": "^5.0.0"
   },
+  "peerDependencies": {
+    "@rozek/sns-persistence-node": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@rozek/sns-persistence-node": {
+      "optional": true
+    }
+  },
   "optionalDependencies": {
-    "@rozek/sns-persistence-node": "workspace:*",
     "better-sqlite3": "^9.0.0"
   },
   "devDependencies": {
+    "@rozek/sns-persistence-node": "workspace:*",
     "@types/better-sqlite3": "^7.6.0",
     "@types/node": "^25.3.3",
     "typescript": "^5.7.2",
