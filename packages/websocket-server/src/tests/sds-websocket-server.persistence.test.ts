@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*               SNS WebSocket Server — Persistence Tests                       *
+*               SDS WebSocket Server — Persistence Tests                       *
 *                                                                              *
 *******************************************************************************/
 
@@ -47,7 +47,7 @@
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
 
-  describe('SNS WebSocket Server — Persistence', () => {
+  describe('SDS WebSocket Server — Persistence', () => {
     let TempDir:  string
     let DbPath:   string
     let Provider: SDS_DesktopPersistenceProvider

@@ -38,7 +38,7 @@ describe('SDS_DesktopPersistenceProvider — Values', () => {
     const { DbPath, cleanup } = makeTmpDb()
     try {
       const P    = new SDS_DesktopPersistenceProvider(DbPath, 'store-1')
-      const Data = new Uint8Array([10, 20, 30, 40])
+      const Item = new Uint8Array([10, 20, 30, 40])
       await P.saveValue('sha256-abc', Data)
       const Loaded = await P.loadValue('sha256-abc')
       expect(Loaded).not.toBeUndefined()
@@ -51,7 +51,7 @@ describe('SDS_DesktopPersistenceProvider — Values', () => {
     const { DbPath, cleanup } = makeTmpDb()
     try {
       const P    = new SDS_DesktopPersistenceProvider(DbPath, 'store-1')
-      const Data = new Uint8Array([1, 2, 3])
+      const Item = new Uint8Array([1, 2, 3])
       await P.saveValue('sha256-x', Data)
       await P.saveValue('sha256-x', Data)
       // Still loadable

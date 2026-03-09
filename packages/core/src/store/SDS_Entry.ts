@@ -1,17 +1,17 @@
 /*******************************************************************************
 *                                                                              *
-*               SDS_Entry — base class for SDS_Note and SDS_Link               *
+*               SDS_Entry — base class for SDS_Item and SDS_Link               *
 *                                                                              *
 *******************************************************************************/
 
-import type { SDS_NoteStore } from '../interfaces/SDS_NoteStore.js'
-import type { SDS_Note }      from './SDS_Note.js'
+import type { SDS_DataStore } from '../interfaces/SDS_DataStore.js'
+import type { SDS_Item }      from './SDS_Item.js'
 import { RootId, TrashId, LostAndFoundId } from './constants.js'
 
 // allows bracket-notation access to internal store methods not declared on the
-// minimal SDS_NoteStore interface, while keeping the constructor type-safe
+// minimal SDS_DataStore interface, while keeping the constructor type-safe
 
-type StoreBackend = SDS_NoteStore & Record<string, any>
+type StoreBackend = SDS_DataStore & Record<string, any>
 
 export class SDS_Entry {
   constructor (
@@ -23,34 +23,34 @@ export class SDS_Entry {
 //                                  Identity                                  //
 //----------------------------------------------------------------------------//
 
-/**** isRootNote / isTrashNote / isLostAndFoundNote / isNote / isLink ****/
+/**** isRootItem / isTrashItem / isLostAndFoundItem / isItem / isLink ****/
 
-  get isRootNote ():         boolean { return this.Id === RootId }
-  get isTrashNote ():        boolean { return this.Id === TrashId }
-  get isLostAndFoundNote (): boolean { return this.Id === LostAndFoundId }
-  get isNote ():             boolean { return this._Store['_KindOf'](this.Id) === 'note' }
+  get isRootItem ():         boolean { return this.Id === RootId }
+  get isTrashItem ():        boolean { return this.Id === TrashId }
+  get isLostAndFoundItem (): boolean { return this.Id === LostAndFoundId }
+  get isItem ():             boolean { return this._Store['_KindOf'](this.Id) === 'item' }
   get isLink ():             boolean { return this._Store['_KindOf'](this.Id) === 'link' }
 
 //----------------------------------------------------------------------------//
 //                                 Hierarchy                                  //
 //----------------------------------------------------------------------------//
 
-/**** outerNote / outerNoteId / outerNotes / outerNoteIds ****/
+/**** outerItem / outerItemId / outerItemChain / outerItemIds ****/
 
-  get outerNote ():SDS_Note | undefined {
-    return this._Store['_outerNoteOf'](this.Id)
+  get outerItem ():SDS_Item | undefined {
+    return this._Store['_outerItemOf'](this.Id)
   }
 
-  get outerNoteId ():string | undefined {
-    return this._Store['_outerNoteIdOf'](this.Id)
+  get outerItemId ():string | undefined {
+    return this._Store['_outerItemIdOf'](this.Id)
   }
 
-  get outerNotes ():SDS_Note[] {
-    return this._Store['_outerNotesOf'](this.Id)
+  get outerItemChain ():SDS_Item[] {
+    return this._Store['_outerItemChainOf'](this.Id)
   }
 
-  get outerNoteIds ():string[] {
-    return this._Store['_outerNoteIdsOf'](this.Id)
+  get outerItemIds ():string[] {
+    return this._Store['_outerItemIdsOf'](this.Id)
   }
 
 //----------------------------------------------------------------------------//
@@ -72,14 +72,14 @@ export class SDS_Entry {
 
 /**** mayBeMovedTo ****/
 
-  mayBeMovedTo (OuterNote:SDS_Note, InsertionIndex?:number):boolean {
-    return this._Store['_mayMoveEntryTo'](this.Id, OuterNote.Id, InsertionIndex)
+  mayBeMovedTo (OuterItem:SDS_Item, InsertionIndex?:number):boolean {
+    return this._Store['_mayMoveEntryTo'](this.Id, OuterItem.Id, InsertionIndex)
   }
 
 /**** moveTo ****/
 
-  moveTo (OuterNote:SDS_Note, InsertionIndex?:number):void {
-    this._Store['moveEntryTo'](this, OuterNote, InsertionIndex)
+  moveTo (OuterItem:SDS_Item, InsertionIndex?:number):void {
+    this._Store['moveEntryTo'](this, OuterItem, InsertionIndex)
   }
 
 //----------------------------------------------------------------------------//

@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                            SNS Network WebRTC                                *
+*                            SDS Network WebRTC                                *
 *                                                                              *
 *******************************************************************************/
 
@@ -47,7 +47,7 @@ import type { SDS_WebSocketProvider } from '@rozek/sds-network-websocket'
 export class SDS_WebRTCProvider
   implements SDS_NetworkProvider, SDS_PresenceProvider
 {
-  readonly StoreID:string
+  readonly StoreId:string
 
   #Options: SDS_WebRTCProviderOptions
   #PeerId:  string = crypto.randomUUID()
@@ -84,7 +84,7 @@ export class SDS_WebRTCProvider
 /**** Constructor ****/
 
   constructor (StoreId:string, Options:SDS_WebRTCProviderOptions = {}) {
-    this.StoreID  = StoreId
+    this.StoreId  = StoreId
     this.#Options = Options
     this.#Fallback = Options.Fallback ?? undefined
   }

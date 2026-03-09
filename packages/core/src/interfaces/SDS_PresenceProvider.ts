@@ -34,7 +34,7 @@ export interface SDS_PresenceProvider {
 /**** onRemoteState — subscribe to peer state updates; State===undefined means offline ****/
 
   onRemoteState (
-    Callback:(PeerID:string, State:SDS_RemotePresenceState | undefined) => void
+    Callback:(PeerId:string, State:SDS_RemotePresenceState | undefined) => void
   ):() => void                                         // returns unsubscribe fn
 
   readonly PeerSet:ReadonlyMap<string,SDS_RemotePresenceState>

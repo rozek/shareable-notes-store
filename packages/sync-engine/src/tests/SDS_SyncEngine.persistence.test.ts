@@ -5,7 +5,7 @@
 *******************************************************************************/
 
 import { describe, it, expect, vi } from 'vitest'
-import { SDS_NoteStore }             from '@rozek/sds-core-jj'
+import { SDS_DataStore }             from '@rozek/sds-core-jj'
 import { SDS_SyncEngine }            from '../sds-sync-engine.js'
 
 /**** makeMockPersistence — creates a fully-mocked persistence provider ****/
@@ -34,36 +34,36 @@ describe('SDS_SyncEngine — Persistence', () => {
     // build a patch from a separate store instance.
     // capture the initial binary BEFORE any changes so TargetStore can start
     // from the same CRDT model base (patches only apply across compatible models).
-    const SourceStore   = SDS_NoteStore.fromScratch()
+    const SourceStore   = SDS_DataStore.fromScratch()
     const InitialBinary = SourceStore.asBinary()
-    const Note          = SourceStore.newNoteAt(SourceStore.RootNote)
-    Note.Label          = 'persisted-note'
+    const Item = SourceStore.newItemAt(SourceStore.RootItem)
+    Item.Label          = 'persisted-data'
     const Patch         = SourceStore.exportPatch()
     expect(Patch.byteLength).toBeGreaterThan(0)
 
     // target store starts from the same initial binary (simulates restart from snapshot)
-    const TargetStore = SDS_NoteStore.fromBinary(InitialBinary)
+    const TargetStore = SDS_DataStore.fromBinary(InitialBinary)
     const Persist     = makeMockPersistence([Patch])
 
     const Engine = new SDS_SyncEngine(TargetStore, { PersistenceProvider:Persist })
     await Engine.start()
 
     expect(Persist.loadPatchesSince).toHaveBeenCalledOnce()
-    // the note should now exist in the target store after patch application
-    expect(TargetStore.EntryWithId(Note.Id)).toBeTruthy()
-    expect(TargetStore.EntryWithId(Note.Id)?.Label).toBe('persisted-note')
+    // the data should now exist in the target store after patch application
+    expect(TargetStore.EntryWithId(Item.Id)).toBeTruthy()
+    expect(TargetStore.EntryWithId(Item.Id)?.Label).toBe('persisted-data')
 
     await Engine.stop()
   })
 
   it('SP-02: internal store change calls appendPatch with patch bytes and monotone seq number', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Persist = makeMockPersistence()
 
     const Engine = new SDS_SyncEngine(Store, { PersistenceProvider:Persist })
     await Engine.start()
 
-    Store.newNoteAt(Store.RootNote)
+    Store.newItemAt(Store.RootItem)
 
     // give async ops a tick to settle
     await new Promise((r) => setTimeout(r, 10))
@@ -80,7 +80,7 @@ describe('SDS_SyncEngine — Persistence', () => {
   })
 
   it('SP-03: accumulated bytes ≥ threshold triggers in-flight writeCheckpoint', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Persist = makeMockPersistence()
 
     const Engine = new SDS_SyncEngine(Store, { PersistenceProvider:Persist })
@@ -90,9 +90,9 @@ describe('SDS_SyncEngine — Persistence', () => {
     // the 512 KiB (524,288 byte) threshold. With 150,000 chars per patch and
     // 4 iterations, accumulated bytes ≈ 600 KB > 512 KiB.
     const BigLabel = 'L'.repeat(150_000)
-    const Note = Store.newNoteAt(Store.RootNote)
+    const Item = Store.newItemAt(Store.RootItem)
     for (let i = 0; i < 4; i++) {
-      Note.Label = BigLabel + i
+      Item.Label = BigLabel + i
     }
 
     // allow async checkpoint writes to complete
@@ -106,14 +106,14 @@ describe('SDS_SyncEngine — Persistence', () => {
   })
 
   it('SP-04: stop() calls prunePatches if AccumulatedBytes > 0 (stop-time checkpoint)', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Persist = makeMockPersistence()
 
     const Engine = new SDS_SyncEngine(Store, { PersistenceProvider:Persist })
     await Engine.start()
 
     // trigger a small change — not enough for in-flight threshold
-    Store.newNoteAt(Store.RootNote)
+    Store.newItemAt(Store.RootItem)
 
     await new Promise((r) => setTimeout(r, 10))
 

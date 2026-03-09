@@ -1,6 +1,6 @@
 # @rozek/sds-network-websocket
 
-WebSocket network and presence provider for the **shareable-data-store** (SNS) family. Connects a local `SDS_NoteStore` to an `SDS_WebSocket_Server` relay, exchanges CRDT patches in real time, and synchronises presence state between all connected peers.
+WebSocket network and presence provider for the **shareable-data-store** (SDS) family. Connects a local `SDS_DataStore` to an `SDS_WebSocket_Server` relay, exchanges CRDT patches in real time, and synchronises presence state between all connected peers.
 
 Works in **browsers** (native WebSocket API) and **Node.js 22+** (built-in WebSocket).
 
@@ -50,7 +50,7 @@ class SDS_WebSocketProvider implements SDS_NetworkProvider, SDS_PresenceProvider
 
   // ── SDS_NetworkProvider ──────────────────────────────────────
 
-  readonly StoreID:string
+  readonly StoreId:string
   get ConnectionState ():SDS_ConnectionState  // 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
   connect (URL:string, Options:SDS_ConnectionOptions):Promise<void>
@@ -92,16 +92,16 @@ All `on*` methods return an unsubscribe function. Call it to stop receiving the 
 ### With `SDS_SyncEngine` (recommended)
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_BrowserPersistenceProvider } from '@rozek/sds-persistence-browser'
 import { SDS_WebSocketProvider }          from '@rozek/sds-network-websocket'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const NoteStore   = SDS_NoteStore.fromScratch()
-const Persistence = new SDS_BrowserPersistenceProvider('my-notes')
-const Network     = new SDS_WebSocketProvider('my-notes')
+const DataStore   = SDS_DataStore.fromScratch()
+const Persistence = new SDS_BrowserPersistenceProvider('my-store')
+const Network     = new SDS_WebSocketProvider('my-store')
 
-const SyncEngine = new SDS_SyncEngine(NoteStore, {
+const SyncEngine = new SDS_SyncEngine(DataStore, {
   PersistenceProvider:Persistence,
   NetworkProvider: Network,
   PresenceProvider:Network,

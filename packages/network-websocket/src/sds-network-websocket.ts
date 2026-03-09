@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                          SNS Network WebSocket                               *
+*                          SDS Network WebSocket                               *
 *                                                                              *
 *******************************************************************************/
 
@@ -88,7 +88,7 @@ import type {
 export class SDS_WebSocketProvider
   implements SDS_NetworkProvider, SDS_PresenceProvider
 {
-  readonly StoreID:string
+  readonly StoreId:string
 
   #ConnectionState: SDS_ConnectionState = 'disconnected'
   #WS:              WebSocket | undefined    = undefined
@@ -110,7 +110,7 @@ export class SDS_WebSocketProvider
 /**** constructor ****/
 
   constructor (StoreId:string) {
-    this.StoreID = StoreId
+    this.StoreId = StoreId
   }
 
 //----------------------------------------------------------------------------//

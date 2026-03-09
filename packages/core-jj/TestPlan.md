@@ -1,6 +1,6 @@
 # Test Plan — `@rozek/sds-core-jj`
 
-This package implements the full SDS_NoteStore contract defined in
+This package implements the full SDS_DataStore contract defined in
 [`@rozek/sds-core` TestPlan.md](../core/TestPlan.md).
 
 All Parts I–XIII of the shared contract apply without modification, with the
@@ -31,10 +31,10 @@ These tests verify that every public symbol can be imported from
 `@rozek/sds-core-jj` and that the json-joy backend is wired up correctly.
 
 - **JJ-01** — `SDS_Error` is exported and constructible
-- **JJ-02** — `SDS_NoteStore` factory methods are exported
-- **JJ-03** — `SDS_Entry`, `SDS_Note`, `SDS_Link` classes are exported
-- **JJ-04** — `fromScratch()` produces a working store with well-known notes
-- **JJ-05** — Instances are `SDS_Note` / `SDS_Link` (correct prototypes)
+- **JJ-02** — `SDS_DataStore` factory methods are exported
+- **JJ-03** — `SDS_Entry`, `SDS_Item`, `SDS_Link` classes are exported
+- **JJ-04** — `fromScratch()` produces a working store with well-known items
+- **JJ-05** — Instances are `SDS_Item` / `SDS_Link` (correct prototypes)
 - **JJ-06** — Two independent stores can exchange patches
 
 ---
@@ -42,12 +42,12 @@ These tests verify that every public symbol can be imported from
 ## Additional tests — Canonical empty snapshot
 
 The json-joy backend loads a pre-generated canonical empty snapshot so that all
-peers start from the same internal CRDT node-ID space.  TC-2.3.1 from the
+peers start from the same internal CRDT node-Id space.  TC-2.3.1 from the
 shared contract already covers the two-peer patch exchange; the following tests
 are specific to the canonical snapshot mechanism:
 
 - **JJ-C-01** — `CanonicalEmptySnapshot` starts with the gzip magic bytes `0x1f 0x8b`
-- **JJ-C-02** — `fromBinary(CanonicalEmptySnapshot)` produces a store with exactly the three well-known notes and no other entries
+- **JJ-C-02** — `fromBinary(CanonicalEmptySnapshot)` produces a store with exactly the three well-known items and no other entries
 
 ---
 

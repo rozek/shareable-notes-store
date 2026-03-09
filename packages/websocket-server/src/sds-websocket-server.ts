@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                          SNS WebSocket Server                                *
+*                          SDS WebSocket Server                                *
 *                                                                              *
 *******************************************************************************/
 
@@ -217,18 +217,18 @@ export class LiveStore {
 //                               JWT utilities                                //
 //----------------------------------------------------------------------------//
 
-  interface SNSClaims {
+  interface SDSClaims {
     sub:   string
     aud:   string
     scope: 'read' | 'write' | 'admin'
     iss?:  string
   }
 
-/**** verifyToken — verifies a JWT and returns its SNS claims; throws on invalid tokens ****/
+/**** verifyToken — verifies a JWT and returns its SDS claims; throws on invalid tokens ****/
 
   async function verifyToken (
     Token:string, Secret:Uint8Array, ExpectedIssuer?:string
-  ):Promise<SNSClaims> {
+  ):Promise<SDSClaims> {
     const { payload:Payload } = await jwtVerify(Token, Secret, {
       algorithms: ['HS256'],
       ...(ExpectedIssuer != null ? { issuer:ExpectedIssuer } : {}),
@@ -309,7 +309,7 @@ export function createSDSServer (Options?:Partial<SDS_ServerOptions>) {
   App.get('/ws/:storeId', upgradeWebSocket(async (HonoCtx) => {
     const StoreId = HonoCtx.req.param('storeId')
     const Token   = HonoCtx.req.query('token') ?? ''
-    let Claims: SNSClaims
+    let Claims: SDSClaims
     try {
       Claims = await verifyToken(Token, Secret, Issuer)
     } catch (_Signal) {
@@ -376,7 +376,7 @@ export function createSDSServer (Options?:Partial<SDS_ServerOptions>) {
   App.get('/signal/:storeId', upgradeWebSocket(async (HonoCtx) => {
     const StoreId = HonoCtx.req.param('storeId')
     const Token   = HonoCtx.req.query('token') ?? ''
-    let Claims:SNSClaims
+    let Claims:SDSClaims
     try {
       Claims = await verifyToken(Token, Secret, Issuer)
     } catch (_Signal) {
@@ -428,7 +428,7 @@ export function createSDSServer (Options?:Partial<SDS_ServerOptions>) {
       return HonoCtx.json({ error:'missing token' }, 401)
     }
     const AdminToken = AuthHeader.slice(7)
-    let AdminClaims:SNSClaims
+    let AdminClaims:SDSClaims
     try {
       AdminClaims = await verifyToken(AdminToken, Secret, Issuer)
     } catch (_Signal) {

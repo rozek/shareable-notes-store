@@ -1,6 +1,6 @@
 # @rozek/sds-core-loro
 
-The **Loro CRDT backend** for [shareable-data-store](../../README.md). Provides `SDS_NoteStore`, `SDS_Note`, `SDS_Link`, `SDS_Entry`, and `SDS_Error` backed by [Loro](https://loro.dev/) — a high-performance Rust-based CRDT library with native WebAssembly support. Drop-in replacement for `@rozek/sds-core-jj` and `@rozek/sds-core-yjs`: only the import path changes.
+The **Loro CRDT backend** for [shareable-data-store](../../README.md). Provides `SDS_DataStore`, `SDS_Item`, `SDS_Link`, `SDS_Entry`, and `SDS_Error` backed by [Loro](https://loro.dev/) — a high-performance Rust-based CRDT library with native WebAssembly support. Drop-in replacement for `@rozek/sds-core-jj` and `@rozek/sds-core-yjs`: only the import path changes.
 
 ---
 
@@ -33,7 +33,7 @@ pnpm add @rozek/sds-core
 
 ## API
 
-The public API is identical across all backends. Refer to the `@rozek/sds-core-jj`[ README](../core-jj/README.md) for the complete reference — `SDS_NoteStore`, `SDS_Note`, `SDS_Link`, `SDS_Entry`, and `SDS_Error` all export the same interface.
+The public API — `SDS_DataStore`, `SDS_Item`, `SDS_Link`, `SDS_Entry`, `SDS_Error`, and all provider interfaces — is identical across all backends and is fully documented in the [`@rozek/sds-core` README](../core/README.md).
 
 The only backend-specific aspects are the binary encoding, cursor format, and patch encoding — see [Loro-specific details](#loro-specific-details) below.
 
@@ -44,23 +44,23 @@ The only backend-specific aspects are the binary encoding, cursor format, and pa
 ### Building a tree and subscribing to changes
 
 ```typescript
-import { SDS_NoteStore } from '@rozek/sds-core-loro'
+import { SDS_DataStore } from '@rozek/sds-core-loro'
 
-const NoteStore = SDS_NoteStore.fromScratch()
+const DataStore = SDS_DataStore.fromScratch()
 
-const unsubscribe = NoteStore.onChangeInvoke((Origin, ChangeSet) => {
+const unsubscribe = DataStore.onChangeInvoke((Origin, ChangeSet) => {
   for (const [EntryId, changedKeys] of Object.entries(ChangeSet)) {
     console.log(`[${Origin}] ${EntryId}: ${[...changedKeys].join(', ')}`)
   }
 })
 
-NoteStore.transact(() => {
-  const Journal = NoteStore.newNoteAt(NoteStore.RootNote)
+DataStore.transact(() => {
+  const Journal = DataStore.newItemAt(DataStore.RootItem)
   Journal.Label = 'Journal'
 
-  const Note = NoteStore.newNoteAt(Journal)
-  Note.Label = '2025-01-01'
-  Note.Info['mood'] = 'hopeful'
+  const Data = DataStore.newItemAt(Journal)
+  Data.Label = '2025-01-01'
+  Data.Info['mood'] = 'hopeful'
 })
 
 unsubscribe()
@@ -69,39 +69,39 @@ unsubscribe()
 ### Syncing two stores via CRDT patches
 
 ```typescript
-import { SDS_NoteStore } from '@rozek/sds-core-loro'
+import { SDS_DataStore } from '@rozek/sds-core-loro'
 
 // two peers start from the same snapshot
-const NoteStoreA = SDS_NoteStore.fromScratch()
-const NoteStoreB = SDS_NoteStore.fromBinary(NoteStoreA.asBinary())
+const DataStoreA = SDS_DataStore.fromScratch()
+const DataStoreB = SDS_DataStore.fromBinary(DataStoreA.asBinary())
 
 // peer A makes a change
-const NoteA = NoteStoreA.newNoteAt(NoteStoreA.RootNote)
-NoteA.Label = 'shared note'
+const ItemA = DataStoreA.newItemAt(DataStoreA.RootItem)
+ItemA.Label = 'shared data'
 
 // peer A exports a patch and peer B applies it
-const Patch = NoteStoreA.exportPatch()
-NoteStoreB.applyRemotePatch(Patch)
+const Patch = DataStoreA.exportPatch()
+DataStoreB.applyRemotePatch(Patch)
 
 // both peers now agree
-const NoteB = NoteStoreB.EntryWithId(Note.Id)
-console.log(NoteB?.Label)  // 'shared note'
+const ItemB = DataStoreB.EntryWithId(Data.Id)
+console.log(ItemB?.Label)  // 'shared data'
 ```
 
 ### Collaborative character editing
 
 ```typescript
-import { SDS_NoteStore } from '@rozek/sds-core-loro'
+import { SDS_DataStore } from '@rozek/sds-core-loro'
 
-const NoteStore = SDS_NoteStore.fromScratch()
-const Note = NoteStore.newNoteAt(NoteStore.RootNote)
+const DataStore = SDS_DataStore.fromScratch()
+const Data = DataStore.newItemAt(DataStore.RootItem)
 
-Note.writeValue('Hello, World!')
+Data.writeValue('Hello, World!')
 
-// replace characters 7–12 with 'SNS'
-Note.changeValue(7, 12, 'SNS')
+// replace characters 7–12 with 'SDS'
+Data.changeValue(7, 12, 'SDS')
 
-console.log(await Note.readValue())  // 'Hello, SNS!'
+console.log(await Data.readValue())  // 'Hello, SDS!'
 ```
 
 ---
@@ -132,11 +132,11 @@ Unlike the json-joy backend (`@rozek/sds-core-jj`), the Loro backend does **not*
 
 ### Binary values
 
-Binary note values (`writeValue(Uint8Array)`) are stored as plain `Uint8Array` fields inside `LoroMap`, which Loro supports natively.
+Binary data values (`writeValue(Uint8Array)`) are stored as plain `Uint8Array` fields inside `LoroMap`, which Loro supports natively.
 
 ### Purge / tombstoning
 
-Because CRDT consistency requires that deleted data can always be re-merged from remote peers, `purgeEntry()` uses **tombstoning** rather than map-key deletion: the entry's `outerNoteId` is set to `''`, making it invisible to all traversal, and the entry is removed from in-memory indices.
+Because CRDT consistency requires that deleted data can always be re-merged from remote peers, `purgeEntry()` uses **tombstoning** rather than map-key deletion: the entry's `outerItemId` is set to `''`, making it invisible to all traversal, and the entry is removed from in-memory indices.
 
 ### Transaction model
 
@@ -146,20 +146,20 @@ The Loro backend uses a `#TransactDepth` counter for nested transaction support.
 
 ## Data Model
 
-Inside the single `Loro` document, the complete note store lives in `doc.getMap('Entries')` — a `LoroMap<string, LoroMap<any>>` mapping entry UUIDs to their data:
+Inside the single `Loro` document, the complete data store lives in `doc.getMap('Entries')` — a `LoroMap<string, LoroMap<any>>` mapping entry UUIDs to their data:
 
-| Field | Type | Notes |
+| Field | Type | Description |
 | --- | --- | --- |
-| `Kind` | `string` | `'note'` or `'link'` |
-| `outerNoteId` | `string` | UUID of outer note; `''` for the root note |
+| `Kind` | `string` | `'item'` or `'link'` |
+| `outerItemId` | `string` | UUID of outer data; `''` for the root data |
 | `OrderKey` | `string` | fractional-indexing key |
 | `Label` | `LoroText` | collaborative string |
 | `Info` | `LoroMap` | arbitrary metadata |
-| `MIMEType` | `string` | notes only; `''` = `'text/plain'` |
+| `MIMEType` | `string` | items only; `''` = `'text/plain'` |
 | `ValueKind` | `string` | `'none'` / `'literal'` / `'binary'` / `*-reference` |
-| `literalValue` | `LoroText` | notes with `ValueKind='literal'` |
-| `binaryValue` | `Uint8Array` | notes with `ValueKind='binary'` |
-| `ValueRef` | `string` (JSON) | notes with `*-reference` ValueKinds |
+| `literalValue` | `LoroText` | items with `ValueKind='literal'` |
+| `binaryValue` | `Uint8Array` | items with `ValueKind='binary'` |
+| `ValueRef` | `string` (JSON) | items with `*-reference` ValueKinds |
 | `TargetId` | `string` | links only |
 
 ---
@@ -170,10 +170,10 @@ To switch from `@rozek/sds-core-jj` (json-joy) to this package, change only the 
 
 ```typescript
 // before
-import { SDS_NoteStore } from '@rozek/sds-core-jj'
+import { SDS_DataStore } from '@rozek/sds-core-jj'
 
 // after
-import { SDS_NoteStore } from '@rozek/sds-core-loro'
+import { SDS_DataStore } from '@rozek/sds-core-loro'
 ```
 
 Persisted binary data (`asBinary()` snapshots and `exportPatch()` patches) is **not** cross-compatible between backends. See the [root README](../../README.md) for a data migration guide.

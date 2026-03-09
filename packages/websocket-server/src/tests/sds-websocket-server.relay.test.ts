@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                  SNS WebSocket Server — Relay Tests                          *
+*                  SDS WebSocket Server — Relay Tests                          *
 *                                                                              *
 *******************************************************************************/
 
@@ -23,7 +23,7 @@
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
 
-  describe('SNS WebSocket Server — Relay', () => {
+  describe('SDS WebSocket Server — Relay', () => {
     it('SR-01: PATCH frame from write client is relayed to all other clients', () => {
       const Store   = new LiveStore('store-1')
       const Sender  = makeClient('write')

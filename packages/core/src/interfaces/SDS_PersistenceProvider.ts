@@ -13,8 +13,8 @@
 //  – json-joy backend: 4-byte big-endian uint32
 //  – Y.js backend:     state vector (variable length)
 //  – Loro backend:     version vector (variable length)
-// SDS_SyncCursor is used exclusively by SDS_NoteStore.exportPatch() and
-// SDS_NoteStore.currentCursor — not by SDS_PersistenceProvider.
+// SDS_SyncCursor is used exclusively by SDS_DataStore.exportPatch() and
+// SDS_DataStore.currentCursor — not by SDS_PersistenceProvider.
 
 export type SDS_SyncCursor = Uint8Array
 

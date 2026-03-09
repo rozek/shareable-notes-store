@@ -16,7 +16,7 @@ describe('SDS_WebSocketProvider — Construction', () => {
   it('WC-01: ConnectionState is disconnected on construction', () => {
     const P = new SDS_WebSocketProvider('store-1')
     expect(P.ConnectionState).toBe('disconnected')
-    expect(P.StoreID).toBe('store-1')
+    expect(P.StoreId).toBe('store-1')
     expect(P.PeerSet.size).toBe(0)
   })
 

@@ -5,7 +5,7 @@
 *******************************************************************************/
 
 import { describe, it, expect, vi } from 'vitest'
-import { SDS_NoteStore }             from '@rozek/sds-core-jj'
+import { SDS_DataStore }             from '@rozek/sds-core-jj'
 import { SDS_SyncEngine }            from '../sds-sync-engine.js'
 
 /**** makeMockNetwork — creates a mocked network provider with trigger helpers ****/
@@ -14,7 +14,7 @@ function makeMockNetwork (storeId = 'store-1') {
   let connState = 'disconnected'
   const handlers: Record<string, Function[]> = { patch:[], value:[], conn:[] }
   return {
-    StoreID: storeId,
+    StoreId: storeId,
     get ConnectionState () { return connState as any },
     connect: vi.fn(async () => { connState = 'connected' }),
     disconnect: vi.fn(() => { connState = 'disconnected' }),
@@ -39,7 +39,7 @@ function makeMockNetwork (storeId = 'store-1') {
 describe('SDS_SyncEngine — Network', () => {
 
   it('SN-01: connectTo() without NetworkProvider throws SDS_Error', async () => {
-    const Store  = SDS_NoteStore.fromScratch()
+    const Store  = SDS_DataStore.fromScratch()
     const Engine = new SDS_SyncEngine(Store)
     await Engine.start()
     await expect(Engine.connectTo('wss://x', { Token:'t' })).rejects.toThrow(expect.objectContaining({ Code:'no-network-provider' }))
@@ -47,7 +47,7 @@ describe('SDS_SyncEngine — Network', () => {
   })
 
   it('SN-02: reconnect() without prior connectTo() throws SDS_Error', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Network = makeMockNetwork()
     const Engine  = new SDS_SyncEngine(Store, { NetworkProvider:Network as any })
     await Engine.start()
@@ -56,24 +56,24 @@ describe('SDS_SyncEngine — Network', () => {
   })
 
   it('SN-03: when connected, internal store change triggers sendPatch', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Network = makeMockNetwork()
     const Engine  = new SDS_SyncEngine(Store, { NetworkProvider:Network as any })
     await Engine.start()
     Network._triggerConn('connected')
-    Store.newNoteAt(Store.RootNote)
+    Store.newItemAt(Store.RootItem)
     await Engine.stop()
     expect(Network.sendPatch).toHaveBeenCalled()
   })
 
   it('SN-04: when disconnected, store change is queued; patch is sent after reconnect', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Network = makeMockNetwork()
     const Engine  = new SDS_SyncEngine(Store, { NetworkProvider:Network as any })
     await Engine.start()
 
-    // remain disconnected — create a note (patch should be queued, not sent)
-    Store.newNoteAt(Store.RootNote)
+    // remain disconnected — create a data (patch should be queued, not sent)
+    Store.newItemAt(Store.RootItem)
     expect(Network.sendPatch).not.toHaveBeenCalled()
 
     // now simulate reconnect — queued patch should be flushed
@@ -84,10 +84,10 @@ describe('SDS_SyncEngine — Network', () => {
   })
 
   it('SN-05: incoming network patch triggers store.applyRemotePatch', async () => {
-    const Store1  = SDS_NoteStore.fromScratch()
-    const Store2  = SDS_NoteStore.fromBinary(Store1.asBinary())
-    const Note    = Store1.newNoteAt(Store1.RootNote)
-    Note.Label    = 'synced'
+    const Store1  = SDS_DataStore.fromScratch()
+    const Store2  = SDS_DataStore.fromBinary(Store1.asBinary())
+    const Item = Store1.newItemAt(Store1.RootItem)
+    Item.Label    = 'synced'
     const Patch   = Store1.exportPatch()
 
     const Network = makeMockNetwork()
@@ -95,7 +95,7 @@ describe('SDS_SyncEngine — Network', () => {
     await Engine.start()
     Network._triggerPatch(Patch)
     await Engine.stop()
-    expect(Store2.EntryWithId(Note.Id)?.Label).toBe('synced')
+    expect(Store2.EntryWithId(Item.Id)?.Label).toBe('synced')
   })
 
 })

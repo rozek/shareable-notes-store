@@ -1,4 +1,4 @@
-# Test Plan — SDS_NoteStore Contract
+# Test Plan — SDS_DataStore Contract
 
 Shared test plan for all `@rozek/sds-core-*` backend packages.
 Every backend (`@rozek/sds-core-jj`, `@rozek/sds-core-yjs`, `@rozek/sds-core-loro`)
@@ -9,7 +9,7 @@ behavioural differences are documented in each backend's own `TestPlan.md`.
 
 ## Goal
 
-Verify that `SDS_NoteStore`, `SDS_Entry`, `SDS_Note`, `SDS_Link`, and
+Verify that `SDS_DataStore`, `SDS_Entry`, `SDS_Item`, `SDS_Link`, and
 `SDS_Error` behave correctly in isolation from any network, persistence, or UI
 layer, and that every backend exposes an identical observable API.
 
@@ -18,22 +18,22 @@ layer, and that every backend exposes an identical observable API.
 ## Scope
 
 **In scope:**
-- Construction — `fromScratch()`, `fromBinary()`, `fromJSON()` produce a valid store with the three well-known notes present
-- Well-known notes — `RootNote`, `TrashNote`, `LostAndFoundNote` have correct IDs, labels, and restrictions
-- Entry creation — `newNoteAt()` and `newLinkAt()` create entries in the correct container at the correct position
+- Construction — `fromScratch()`, `fromBinary()`, `fromJSON()` produce a valid store with the three well-known items present
+- Well-known items — `RootItem`, `TrashItem`, `LostAndFoundItem` have correct IDs, labels, and restrictions
+- Entry creation — `newItemAt()` and `newLinkAt()` create entries in the correct container at the correct position
 - Entry lookup — `EntryWithId()` returns the correct entry or `undefined`
 - Label & Info — getters and setters fire ChangeSet events and mutate the CRDT
 - Value handling — `writeValue()` selects the correct `ValueKind`; `readValue()` returns the stored value; `changeValue()` splices literal values collaboratively
 - Inner entry list — `innerEntryList` returns children sorted by `(OrderKey, Id)`; insertion order is respected
 - Move — `moveEntryTo()` / `moveTo()` update placement; cycle detection blocks invalid moves
-- Delete — `deleteEntry()` / `delete()` moves entry and all descendants to `TrashNote`; well-known notes cannot be deleted
-- Purge — `purgeEntry()` / `purge()` permanently removes entries from `TrashNote`; throws `purge-protected` when the entry has incoming links from the live tree; `purgeExpiredTrashEntries()` auto-purges entries older than a configurable TTL
+- Delete — `deleteEntry()` / `delete()` moves entry and all descendants to `TrashItem`; well-known items cannot be deleted
+- Purge — `purgeEntry()` / `purge()` permanently removes entries from `TrashItem`; throws `purge-protected` when the entry has incoming links from the live tree; `purgeExpiredTrashEntries()` auto-purges entries older than a configurable TTL
 - Serialisation — `asBinary()` produces gzip-compressed data that `fromBinary()` can restore exactly; `asJSON()` / `fromJSON()` round-trip correctly
 - Transactions — `transact()` is nestable; only the outermost call emits a ChangeSet event
 - Change events — `onChangeInvoke()` fires with correct origin and ChangeSet; the returned unsubscribe function stops delivery
 - Remote patch — `applyRemotePatch()` applies a patch exported from a second store instance, merging changes correctly
-- Orphan recovery — `recoverOrphans()` places orphans into `LostAndFoundNote`
-- Deserialisation — `deserializeNoteInto()` and `deserializeLinkInto()` import subtrees
+- Orphan recovery — `recoverOrphans()` places orphans into `LostAndFoundItem`
+- Deserialisation — `deserializeItemInto()` and `deserializeLinkInto()` import subtrees
 
 **Out of scope:** Persistence (IndexedDB, SQLite), Network (WebSocket, WebRTC), Presence, SyncEngine.
 Backend-specific initialisation details (e.g. canonical empty snapshots) are tested in the respective backend packages.
@@ -45,7 +45,7 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 - **Runner:** Vitest 2 with `globals: true`
 - **Language:** TypeScript 5.7, ESM modules
 - **Platform:** Node.js 22+ (no browser APIs needed)
-- **No mocks** — every test creates a fresh store via `SDS_NoteStore.fromScratch()`; time-sensitive tests (D-14 – D-21) use Vitest fake timers (`vi.useFakeTimers` / `vi.setSystemTime` / `vi.advanceTimersByTime`) instead of mocking the store itself
+- **No mocks** — every test creates a fresh store via `SDS_DataStore.fromScratch()`; time-sensitive tests (D-14 – D-21) use Vitest fake timers (`vi.useFakeTimers` / `vi.setSystemTime` / `vi.advanceTimersByTime`) instead of mocking the store itself
 
 ---
 
@@ -67,10 +67,10 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 fromScratch — return value and well-known entries
 
-- **TC-2.1.1** — `fromScratch()` returns an object that is an instance of `SDS_NoteStore`
-- **TC-2.1.2** — A freshly created store exposes a `RootNote` with the correct well-known `Id`
-- **TC-2.1.3** — A freshly created store exposes a `TrashNote` with the correct well-known `Id`
-- **TC-2.1.4** — A freshly created store exposes a `LostAndFoundNote` with the correct well-known `Id`
+- **TC-2.1.1** — `fromScratch()` returns an object that is an instance of `SDS_DataStore`
+- **TC-2.1.2** — A freshly created store exposes a `RootItem` with the correct well-known `Id`
+- **TC-2.1.3** — A freshly created store exposes a `TrashItem` with the correct well-known `Id`
+- **TC-2.1.4** — A freshly created store exposes a `LostAndFoundItem` with the correct well-known `Id`
 
 #### 1.2 Binary and JSON round-trips
 
@@ -87,54 +87,54 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 ---
 
-## Part III — Well-known Notes
+## Part III — Well-known Data Items
 
 ### 1. Identity flags
 
 #### 1.1 Type predicates
 
-- **TC-3.1.1** — `RootNote.isRootNote` is `true`
-- **TC-3.1.2** — `TrashNote.isTrashNote` is `true`
-- **TC-3.1.3** — `LostAndFoundNote.isLostAndFoundNote` is `true`
-- **TC-3.1.4** — `RootNote.isNote` is `true`
+- **TC-3.1.1** — `RootItem.isRootItem` is `true`
+- **TC-3.1.2** — `TrashItem.isTrashItem` is `true`
+- **TC-3.1.3** — `LostAndFoundItem.isLostAndFoundItem` is `true`
+- **TC-3.1.4** — `RootItem.isItem` is `true`
 
-### 2. Outer-note relationships
+### 2. Outer-data relationships
 
-#### 2.1 outerNote links
+#### 2.1 outerItem links
 
-- **TC-3.2.1** — `RootNote.outerNote` is `undefined`
-- **TC-3.2.2** — `TrashNote.outerNote` is `RootNote`
-- **TC-3.2.3** — `LostAndFoundNote.outerNote` is `RootNote`
+- **TC-3.2.1** — `RootItem.outerItem` is `undefined`
+- **TC-3.2.2** — `TrashItem.outerItem` is `RootItem`
+- **TC-3.2.3** — `LostAndFoundItem.outerItem` is `RootItem`
 
 ### 3. Deletion restrictions
 
 #### 3.1 mayBeDeleted flag
 
-- **TC-3.3.1** — `RootNote.mayBeDeleted` is `false`
-- **TC-3.3.2** — `TrashNote.mayBeDeleted` is `false`
-- **TC-3.3.3** — `LostAndFoundNote.mayBeDeleted` is `false`
+- **TC-3.3.1** — `RootItem.mayBeDeleted` is `false`
+- **TC-3.3.2** — `TrashItem.mayBeDeleted` is `false`
+- **TC-3.3.3** — `LostAndFoundItem.mayBeDeleted` is `false`
 
 ### 4. Labels and initial contents
 
 #### 4.1 Default labels and root membership
 
-- **TC-3.4.1** — `TrashNote.Label` defaults to `'trash'`
-- **TC-3.4.2** — `LostAndFoundNote.Label` defaults to `'lost-and-found'`
-- **TC-3.4.3** — `TrashNote.Label` can be changed to a new string
-- **TC-3.4.4** — `RootNote.innerEntryList` contains both `TrashNote` and `LostAndFoundNote`
+- **TC-3.4.1** — `TrashItem.Label` defaults to `'trash'`
+- **TC-3.4.2** — `LostAndFoundItem.Label` defaults to `'lost-and-found'`
+- **TC-3.4.3** — `TrashItem.Label` can be changed to a new string
+- **TC-3.4.4** — `RootItem.innerEntryList` contains both `TrashItem` and `LostAndFoundItem`
 
 ---
 
 ## Part IV — Entry Creation & Lookup
 
-### 1. newNoteAt
+### 1. newItemAt
 
 #### 1.1 Return value and initial properties
 
-- **TC-4.1.1** — `newNoteAt()` returns an object that is an instance of `SDS_Note`
-- **TC-4.1.2** — The created note has the MIME type that was passed to `newNoteAt()`
-- **TC-4.1.3** — The created note appears in the container's `innerEntryList`
-- **TC-4.1.4** — `note.outerNote` equals the container that was passed to `newNoteAt()`
+- **TC-4.1.1** — `newItemAt()` returns an object that is an instance of `SDS_Item`
+- **TC-4.1.2** — The created data has the MIME type that was passed to `newItemAt()`
+- **TC-4.1.3** — The created data appears in the container's `innerEntryList`
+- **TC-4.1.4** — `data.outerItem` equals the container that was passed to `newItemAt()`
 
 ### 2. newLinkAt
 
@@ -155,7 +155,7 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 4.1 Guard conditions
 
-- **TC-4.4.1** — `newNoteAt()` with an empty MIME type throws an `SDS_Error` with `Code` `'invalid-argument'`
+- **TC-4.4.1** — `newItemAt()` with an empty MIME type throws an `SDS_Error` with `Code` `'invalid-argument'`
 - **TC-4.4.2** — `newLinkAt()` with a non-existent target entry throws
 
 ---
@@ -166,16 +166,16 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 Getter, setter, and change event
 
-- **TC-5.1.1** — A newly created note has an empty string `Label`
-- **TC-5.1.2** — Setting `note.Label = value` persists and returns `value` via the getter
+- **TC-5.1.1** — A newly created data has an empty string `Label`
+- **TC-5.1.2** — Setting `data.Label = value` persists and returns `value` via the getter
 - **TC-5.1.3** — A `Label` change fires a ChangeSet that includes the `'Label'` key for the affected entry
 
 ### 2. Info proxy
 
 #### 2.1 Read, write, delete, and change events
 
-- **TC-5.2.1** — `note.Info` is initially an empty object
-- **TC-5.2.2** — Assigning `note.Info.tag = value` stores the value and makes it accessible via `note.Info.tag`
+- **TC-5.2.1** — `data.Info` is initially an empty object
+- **TC-5.2.2** — Assigning `data.Info.tag = value` stores the value and makes it accessible via `data.Info.tag`
 - **TC-5.2.3** — Setting an Info key fires a ChangeSet that includes `'Info.tag'` for the affected entry
 - **TC-5.2.4** — Deleting an Info key removes it from the Info object
 - **TC-5.2.5** — Deleting an Info key fires a ChangeSet that includes `'Info.tag'` for the affected entry
@@ -188,13 +188,13 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 Writing values of different kinds
 
-- **TC-6.1.1** — A newly created note has `ValueKind` `'none'`
+- **TC-6.1.1** — A newly created data has `ValueKind` `'none'`
 - **TC-6.1.2** — `writeValue(undefined)` sets `ValueKind` to `'none'`
 - **TC-6.1.3** — `writeValue(smallString)` sets `ValueKind` to `'literal'`
 - **TC-6.1.4** — `writeValue(smallUint8Array)` sets `ValueKind` to `'binary'`
 - **TC-6.1.5** — `writeValue(largeString)` beyond `LiteralSizeLimit` sets `ValueKind` to `'literal-reference'`
 - **TC-6.1.6** — `writeValue(largeUint8Array)` beyond `BinarySizeLimit` sets `ValueKind` to `'binary-reference'`
-- **TC-6.1.7** — `writeValue(undefined)` on a note with an existing value resets `ValueKind` to `'none'`
+- **TC-6.1.7** — `writeValue(undefined)` on a data with an existing value resets `ValueKind` to `'none'`
 
 ### 2. Reading values back
 
@@ -227,10 +227,10 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 Default and index-based placement
 
-- **TC-7.1.1** — Three notes created without an `InsertionIndex` appear in `innerEntryList` in creation order
-- **TC-7.1.2** — A note created with `InsertionIndex` `0` is placed at the front of `innerEntryList`
-- **TC-7.1.3** — A note created with `InsertionIndex` `1` is placed at the second position of `innerEntryList`
-- **TC-7.1.4** — A note created with an `InsertionIndex` beyond the current length is appended at the end
+- **TC-7.1.1** — Three items created without an `InsertionIndex` appear in `innerEntryList` in creation order
+- **TC-7.1.2** — A data created with `InsertionIndex` `0` is placed at the front of `innerEntryList`
+- **TC-7.1.3** — A data created with `InsertionIndex` `1` is placed at the second position of `innerEntryList`
+- **TC-7.1.4** — A data created with an `InsertionIndex` beyond the current length is appended at the end
 
 ### 2. innerEntryList API
 
@@ -248,10 +248,10 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 Placement update and list synchronisation
 
-- **TC-8.1.1** — After `moveEntryTo(entry, target)`, `entry.outerNote` equals `target`
+- **TC-8.1.1** — After `moveEntryTo(entry, target)`, `entry.outerItem` equals `target`
 - **TC-8.1.2** — The moved entry appears in the target container's `innerEntryList`
 - **TC-8.1.3** — The moved entry is removed from the source container's `innerEntryList`
-- **TC-8.1.4** — `moveEntryTo()` fires a ChangeSet containing `'outerNote'` for the entry and `'innerEntryList'` for both the source and target containers
+- **TC-8.1.4** — `moveEntryTo()` fires a ChangeSet containing `'outerItem'` for the entry and `'innerEntryList'` for both the source and target containers
 
 ### 2. Cycle detection
 
@@ -263,11 +263,11 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 ### 3. Special cases
 
-#### 3.1 Well-known note constraints and positional insertion
+#### 3.1 Well-known data constraints and positional insertion
 
-- **TC-8.3.1** — `TrashNote.mayBeMovedTo(RootNote)` returns `true`
-- **TC-8.3.2** — `TrashNote.mayBeMovedTo(innerNote)` returns `false` (TrashNote may only sit at root level)
-- **TC-8.3.3** — `RootNote.mayBeMovedTo(anyContainer)` returns `false`
+- **TC-8.3.1** — `TrashItem.mayBeMovedTo(RootItem)` returns `true`
+- **TC-8.3.2** — `TrashItem.mayBeMovedTo(innerItem)` returns `false` (TrashItem may only sit at root level)
+- **TC-8.3.3** — `RootItem.mayBeMovedTo(anyContainer)` returns `false`
 - **TC-8.3.4** — `moveEntryTo()` with `InsertionIndex` `0` inserts the entry at the front of the target list
 - **TC-8.3.5** — `entry.moveTo(container)` is equivalent to `store.moveEntryTo(entry, container)`
 
@@ -277,32 +277,32 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 ### 1. deleteEntry
 
-#### 1.1 Moving to TrashNote
+#### 1.1 Moving to TrashItem
 
-- **TC-9.1.1** — `deleteEntry(note)` moves the note to `TrashNote`
-- **TC-9.1.2** — All children of a deleted note are also moved to the trash hierarchy
-- **TC-9.1.3** — `deleteEntry()` fires a ChangeSet containing `'outerNote'` and `'innerEntryList'`
+- **TC-9.1.1** — `deleteEntry(data)` moves the data to `TrashItem`
+- **TC-9.1.2** — All children of a deleted data are also moved to the trash hierarchy
+- **TC-9.1.3** — `deleteEntry()` fires a ChangeSet containing `'outerItem'` and `'innerEntryList'`
 
-#### 1.2 Well-known note guards
+#### 1.2 Well-known data guards
 
-- **TC-9.1.4** — `deleteEntry(RootNote)` throws an `SDS_Error` with `Code` `'delete-not-permitted'`
-- **TC-9.1.5** — `deleteEntry(TrashNote)` throws
-- **TC-9.1.6** — `deleteEntry(LostAndFoundNote)` throws
+- **TC-9.1.4** — `deleteEntry(RootItem)` throws an `SDS_Error` with `Code` `'delete-not-permitted'`
+- **TC-9.1.5** — `deleteEntry(TrashItem)` throws
+- **TC-9.1.6** — `deleteEntry(LostAndFoundItem)` throws
 
 ### 2. purgeEntry
 
 #### 2.1 Permanent removal and protection rules
 
-- **TC-9.2.1** — `purgeEntry()` on a note not in `TrashNote` throws an `SDS_Error` with `Code` `'purge-not-in-trash'`
-- **TC-9.2.2** — `purgeEntry()` permanently removes a note that is in `TrashNote`
-- **TC-9.2.3** — `purgeEntry()` throws an `SDS_Error` with `Code` `'purge-protected'` when the note has an incoming link from the root-reachable tree; the entry remains in the store
+- **TC-9.2.1** — `purgeEntry()` on a data not in `TrashItem` throws an `SDS_Error` with `Code` `'purge-not-in-trash'`
+- **TC-9.2.2** — `purgeEntry()` permanently removes a data that is in `TrashItem`
+- **TC-9.2.3** — `purgeEntry()` throws an `SDS_Error` with `Code` `'purge-protected'` when the data has an incoming link from the root-reachable tree; the entry remains in the store
 
 ### 3. Entry-level shortcuts
 
 #### 3.1 delete() and purge() proxy methods
 
-- **TC-9.3.1** — `note.delete()` is equivalent to calling `store.deleteEntry(note)`
-- **TC-9.3.2** — `note.purge()` throws when the note is not in `TrashNote`
+- **TC-9.3.1** — `data.delete()` is equivalent to calling `store.deleteEntry(data)`
+- **TC-9.3.2** — `data.purge()` throws when the data is not in `TrashItem`
 
 ### 4. Trash TTL and auto-purge
 
@@ -337,7 +337,7 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 #### 1.1 Round-trip fidelity
 
 - **TC-10.1.1** — `asBinary()` returns a `Uint8Array` that starts with the gzip magic bytes `0x1f 0x8b`
-- **TC-10.1.2** — All notes survive a `fromBinary(asBinary())` round-trip
+- **TC-10.1.2** — All items survive a `fromBinary(asBinary())` round-trip
 - **TC-10.1.3** — `Label` values are preserved after a binary round-trip
 - **TC-10.1.4** — `innerEntryList` order is preserved after a binary round-trip
 - **TC-10.1.5** — A stored literal value is recovered intact after a binary round-trip
@@ -353,7 +353,7 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 3.1 Deep hierarchy preservation
 
-- **TC-10.3.1** — Nested note hierarchies are preserved after a binary round-trip
+- **TC-10.3.1** — Nested data hierarchies are preserved after a binary round-trip
 
 ---
 
@@ -363,9 +363,9 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 1.1 Firing and ChangeSet content
 
-- **TC-11.1.1** — The `onChangeInvoke` callback is called at least once after `newNoteAt()`
-- **TC-11.1.2** — The ChangeSet fired after `newNoteAt()` contains entries for both the new note and the container
-- **TC-11.1.3** — The ChangeSet entry for the new note includes `'outerNote'`
+- **TC-11.1.1** — The `onChangeInvoke` callback is called at least once after `newItemAt()`
+- **TC-11.1.2** — The ChangeSet fired after `newItemAt()` contains entries for both the new data and the container
+- **TC-11.1.3** — The ChangeSet entry for the new data includes `'outerItem'`
 - **TC-11.1.4** — The ChangeSet entry for the container includes `'innerEntryList'`
 
 ### 2. Unsubscribe
@@ -411,26 +411,26 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 4.1 Placement changes
 
-- **TC-12.4.1** — After `applyRemotePatch` that moves an entry, `outerNote` and both containers' `innerEntryList` are correct on the receiver
-- **TC-12.4.2** — After `applyRemotePatch` that purges an entry, the entry is absent from the receiver and absent from `TrashNote.innerEntryList`
+- **TC-12.4.1** — After `applyRemotePatch` that moves an entry, `outerItem` and both containers' `innerEntryList` are correct on the receiver
+- **TC-12.4.2** — After `applyRemotePatch` that purges an entry, the entry is absent from the receiver and absent from `TrashItem.innerEntryList`
 
 #### 4.2 ChangeSet precision
 
-- **TC-12.4.3** — The ChangeSet produced by `applyRemotePatch` records `outerNote` only for entries whose placement actually changed; unaffected entries do not carry an `outerNote` entry
+- **TC-12.4.3** — The ChangeSet produced by `applyRemotePatch` records `outerItem` only for entries whose placement actually changed; unaffected entries do not carry an `outerItem` entry
 
 ---
 
 ## Part XIII — Import (Deserialisation)
 
-### 1. Note deserialisation
+### 1. Data deserialisation
 
-#### 1.1 deserializeNoteInto — structure and identity
+#### 1.1 deserializeItemInto — structure and identity
 
-- **TC-13.1.1** — `deserializeNoteInto()` creates a note in the specified container
-- **TC-13.1.2** — The imported note is assigned a new `Id` (not the original one)
-- **TC-13.1.3** — The imported note has the same `Label` as the serialised source
-- **TC-13.1.4** — The imported note has the same MIME type as the serialised source
-- **TC-13.1.5** — Nested inner notes are imported and their nesting relationships are preserved
+- **TC-13.1.1** — `deserializeItemInto()` creates a data in the specified container
+- **TC-13.1.2** — The imported data is assigned a new `Id` (not the original one)
+- **TC-13.1.3** — The imported data has the same `Label` as the serialised source
+- **TC-13.1.4** — The imported data has the same MIME type as the serialised source
+- **TC-13.1.5** — Nested inner items are imported and their nesting relationships are preserved
 
 ### 2. Link deserialisation
 
@@ -442,14 +442,14 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 3.1 Guard on malformed data
 
-- **TC-13.3.1** — Passing `null` or a non-object to `deserializeNoteInto()` throws an `SDS_Error` with `Code` `'invalid-argument'`
+- **TC-13.3.1** — Passing `null` or a non-object to `deserializeItemInto()` throws an `SDS_Error` with `Code` `'invalid-argument'`
 
 ---
 
 ## Implementing the contract
 
-Each backend package runs the shared test suite against its own `SDS_NoteStore`
-implementation.  The test files (`SDS_NoteStore.construction.test.ts`, …) are
+Each backend package runs the shared test suite against its own `SDS_DataStore`
+implementation.  The test files (`SDS_DataStore.construction.test.ts`, …) are
 identical across backends; only the import path and any backend-specific
 adaptations differ.
 

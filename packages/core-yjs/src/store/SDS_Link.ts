@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*        SDS_Link — points to a fixed target Note, set at creation time        *
+*        SDS_Link — points to a fixed target Data, set at creation time        *
 *                                                                              *
 *******************************************************************************/
 

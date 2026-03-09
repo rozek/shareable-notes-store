@@ -1,6 +1,6 @@
 # @rozek/sds-sync-engine
 
-The orchestration layer of the **shareable-data-store** (SNS) family. `SDS_SyncEngine` wires an `SDS_NoteStore` to a persistence provider, a network provider, and a presence provider, and manages the full lifecycle: startup restore, offline patch queuing, automatic checkpointing, large-value transfer, and presence heartbeats.
+The orchestration layer of the **shareable-data-store** (SDS) family. `SDS_SyncEngine` wires an `SDS_DataStore` to a persistence provider, a network provider, and a presence provider, and manages the full lifecycle: startup restore, offline patch queuing, automatic checkpointing, large-value transfer, and presence heartbeats.
 
 ---
 
@@ -28,7 +28,7 @@ Every local mutation's patch bytes are accumulated. When the total crosses **512
 
 ### Large-value transfer
 
-When a note's value changes to a reference kind (`'literal-reference'` or `'binary-reference'`), the engine sends the blob to the network provider. When the store receives a patch referencing an unknown blob hash, the engine requests the blob from the network provider.
+When a data's value changes to a reference kind (`'literal-reference'` or `'binary-reference'`), the engine sends the blob to the network provider. When the store receives a patch referencing an unknown blob hash, the engine requests the blob from the network provider.
 
 ### Presence heartbeat
 
@@ -48,7 +48,7 @@ When running in a browser or Tauri context, the engine optionally uses a `Broadc
 import { SDS_SyncEngine } from '@rozek/sds-sync-engine'
 
 class SDS_SyncEngine {
-  constructor(Store:SDS_NoteStore, Options?: SDS_SyncEngineOptions)
+  constructor(Store:SDS_DataStore, Options?: SDS_SyncEngineOptions)
 
   // ── Lifecycle ────────────────────────────────────────────────
 
@@ -108,18 +108,18 @@ All providers are optional. You can use any combination — for example persiste
 ### Persistence only — offline-capable local store
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_DesktopPersistenceProvider } from '@rozek/sds-persistence-node'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-store')
 
 const engine = new SDS_SyncEngine(store, { PersistenceProvider:persistence })
 await engine.start()
 
-const note = store.newNoteAt('text/plain', store.RootNote)
-note.Label = 'This note survives restarts'
+const data = store.newItemAt('text/plain', store.RootItem)
+data.Label = 'This data survives restarts'
 
 await engine.stop()  // writes checkpoint, closes DB
 ```
@@ -127,14 +127,14 @@ await engine.stop()  // writes checkpoint, closes DB
 ### Full stack — persistence + WebSocket + presence
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_BrowserPersistenceProvider } from '@rozek/sds-persistence-browser'
 import { SDS_WebSocketProvider }          from '@rozek/sds-network-websocket'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_BrowserPersistenceProvider('my-notes')
-const network = new SDS_WebSocketProvider('my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_BrowserPersistenceProvider('my-store')
+const network = new SDS_WebSocketProvider('my-store')
 
 const engine = new SDS_SyncEngine(store, {
   PersistenceProvider:persistence,
@@ -158,7 +158,7 @@ engine.onConnectionChange((state) => {
 engine.setPresenceTo({
   UserName: 'Alice',
   UserColor:'#3498db',
-  UserFocus:{ entryId:note.Id, Property:'Value', Cursor:{ from:4, to:4 } },
+  UserFocus:{ entryId:data.Id, Property:'Value', Cursor:{ from:4, to:4 } },
 })
 
 // react to any peer change (local or remote)

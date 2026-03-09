@@ -18,7 +18,7 @@ export interface SDS_ConnectionOptions {
 }
 
 export interface SDS_NetworkProvider {
-  readonly StoreID:string          // the store id this provider is connected to
+  readonly StoreId:string          // the store id this provider is connected to
   readonly ConnectionState:SDS_ConnectionState       // current connection state
 
 /**** connect — open an authenticated connection to a relay server ****/

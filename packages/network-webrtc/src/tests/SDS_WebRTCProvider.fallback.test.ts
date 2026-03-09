@@ -27,7 +27,7 @@ import { SDS_WebRTCProvider }                    from '../sds-network-webrtc.js'
 
   function makeMockFallback () {
     return {
-      StoreID:           'store-1',
+      StoreId:           'store-1',
       get ConnectionState () { return 'disconnected' as const },
       connect:           vi.fn().mockResolvedValue(undefined),
       disconnect:        vi.fn(),

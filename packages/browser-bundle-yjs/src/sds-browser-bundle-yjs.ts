@@ -1,10 +1,10 @@
 /*******************************************************************************
 *                                                                              *
-*                       SNS Browser Bundle YJS — Entry                         *
+*                       SDS Browser Bundle YJS — Entry                         *
 *                                                                              *
 *******************************************************************************/
 
-// Re-exports the complete public API of all SNS packages in one place so that
+// Re-exports the complete public API of all SDS packages in one place so that
 // Vite / Rollup can bundle everything — including npm dependencies — into a 
 // single self-contained ESM file.
 

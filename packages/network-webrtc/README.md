@@ -1,6 +1,6 @@
 # @rozek/sds-network-webrtc
 
-WebRTC peer-to-peer network and presence provider for the **shareable-data-store** (SNS) family. Exchanges CRDT patches directly between browser tabs or devices over RTCDataChannel, using a lightweight WebSocket signalling endpoint for connection setup. Falls back automatically to `SDS_WebSocketProvider` if WebRTC is unavailable or the signalling server cannot be reached.
+WebRTC peer-to-peer network and presence provider for the **shareable-data-store** (SDS) family. Exchanges CRDT patches directly between browser tabs or devices over RTCDataChannel, using a lightweight WebSocket signalling endpoint for connection setup. Falls back automatically to `SDS_WebSocketProvider` if WebRTC is unavailable or the signalling server cannot be reached.
 
 **Browser only** — requires `RTCPeerConnection` and `RTCDataChannel`.
 
@@ -100,14 +100,14 @@ type SignalMessage =
 ### Basic — WebRTC only, no fallback
 
 ```typescript
-import { SDS_NoteStore }       from '@rozek/sds-core'
+import { SDS_DataStore }       from '@rozek/sds-core'
 import { SDS_WebRTCProvider }  from '@rozek/sds-network-webrtc'
 import { SDS_SyncEngine }      from '@rozek/sds-sync-engine'
 
-const NoteStore = SDS_NoteStore.fromScratch()
-const Network   = new SDS_WebRTCProvider('my-notes')
+const DataStore = SDS_DataStore.fromScratch()
+const Network   = new SDS_WebRTCProvider('my-store')
 
-const SyncEngine = new SDS_SyncEngine(NoteStore, {
+const SyncEngine = new SDS_SyncEngine(DataStore, {
   NetworkProvider: Network,
   PresenceProvider:Network,
 })
@@ -119,18 +119,18 @@ await SyncEngine.connectTo('wss://my-server.example.com', { Token:'<jwt>' })
 ### With automatic WebSocket fallback
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_BrowserPersistenceProvider } from '@rozek/sds-persistence-browser'
 import { SDS_WebSocketProvider }          from '@rozek/sds-network-websocket'
 import { SDS_WebRTCProvider }             from '@rozek/sds-network-webrtc'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const NoteStore   = SDS_NoteStore.fromScratch()
-const Persistence = new SDS_BrowserPersistenceProvider('my-notes')
-const WSFallback  = new SDS_WebSocketProvider('my-notes')
-const Network     = new SDS_WebRTCProvider('my-notes', { Fallback:WSFallback })
+const DataStore   = SDS_DataStore.fromScratch()
+const Persistence = new SDS_BrowserPersistenceProvider('my-store')
+const WSFallback  = new SDS_WebSocketProvider('my-store')
+const Network     = new SDS_WebRTCProvider('my-store', { Fallback:WSFallback })
 
-const SyncEngine = new SDS_SyncEngine(NoteStore, {
+const SyncEngine = new SDS_SyncEngine(DataStore, {
   PersistenceProvider:Persistence,
   NetworkProvider: Network,
   PresenceProvider:Network,
@@ -144,7 +144,7 @@ await SyncEngine.connectTo('wss://my-server.example.com', { Token:'<jwt>' })
 ### Custom ICE servers (TURN for strict NATs)
 
 ```typescript
-const network = new SDS_WebRTCProvider('my-notes', {
+const network = new SDS_WebRTCProvider('my-store', {
   ICEServers:[
     { urls:'stun:stun.l.google.com:19302' },
     {

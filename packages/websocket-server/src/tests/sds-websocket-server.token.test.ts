@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*               SNS WebSocket Server — Token Issuance Tests                    *
+*               SDS WebSocket Server — Token Issuance Tests                    *
 *                                                                              *
 *******************************************************************************/
 
@@ -25,7 +25,7 @@
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
 
-  describe('SNS WebSocket Server — Token Issuance', () => {
+  describe('SDS WebSocket Server — Token Issuance', () => {
     const { app } = createSDSServer({ JWTSecret:SECRET_STR })
 
     it('ST-01: POST /api/token without Authorization returns 401', async () => {

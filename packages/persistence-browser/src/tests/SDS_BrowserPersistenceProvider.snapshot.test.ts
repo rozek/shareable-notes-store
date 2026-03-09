@@ -25,7 +25,7 @@ describe('SDS_BrowserPersistenceProvider — Snapshot', () => {
   })
 
   it('BS-02: saveSnapshot then loadSnapshot returns same bytes', async () => {
-    const Data = new Uint8Array([1, 2, 3])
+    const Item = new Uint8Array([1, 2, 3])
     await Provider.saveSnapshot(Data)
     const Loaded = await Provider.loadSnapshot()
     expect(Loaded).not.toBeUndefined()

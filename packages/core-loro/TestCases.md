@@ -6,7 +6,7 @@ shared contract; only the import path points to `@rozek/sds-core-loro`.
 
 ---
 
-## Backend notes
+## Backend items
 
 ### C-11 — Two independent fromScratch() stores can exchange patches
 
@@ -18,7 +18,7 @@ required.
 
 ### Purge behaviour
 
-`purgeEntry()` tombstones an entry by setting its `outerNoteId` to `''`
+`purgeEntry()` tombstones an entry by setting its `outerItemId` to `''`
 instead of physically removing the map key.  The observable result is
 identical to the contract specification: `EntryWithId(id)` returns `undefined`
 and the entry no longer appears in any `innerEntryList`.

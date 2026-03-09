@@ -17,7 +17,7 @@ Verify that `SDS_DesktopPersistenceProvider` reliably persists and restores snap
 - Value blob save / load / ref-counted release
 
 **Out of scope:**
-- Integration with `SDS_NoteStore` (covered by `@rozek/sds-sync-engine` tests)
+- Integration with `SDS_DataStore` (covered by `@rozek/sds-sync-engine` tests)
 - Concurrent access from multiple processes
 
 ---

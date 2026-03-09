@@ -4,7 +4,7 @@
   "version": "0.0.1",
   "keywords": [
     "crdt",
-    "notes",
+    "items",
     "collaborative",
     "offline-first",
     "yjs",

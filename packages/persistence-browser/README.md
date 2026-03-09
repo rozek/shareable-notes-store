@@ -1,6 +1,6 @@
 # @rozek/sds-persistence-browser
 
-IndexedDB persistence provider for the **shareable-data-store** (SNS) family. Stores CRDT snapshots, incremental patches, and large value blobs in the browser's built-in IndexedDB — works in any modern browser, including offline PWAs and Electron renderer processes.
+IndexedDB persistence provider for the **shareable-data-store** (SDS) family. Stores CRDT snapshots, incremental patches, and large value blobs in the browser's built-in IndexedDB — works in any modern browser, including offline PWAs and Electron renderer processes.
 
 ---
 
@@ -59,7 +59,7 @@ class SDS_BrowserPersistenceProvider implements SDS_PersistenceProvider {
 |---|---|
 | `StoreId` | Logical store name; determines the IndexedDB database name (`sns:<StoreId>`) |
 
-`releaseValue` uses reference counting: the blob row is deleted only when the counter reaches zero, so the same blob can be referenced by multiple notes safely.
+`releaseValue` uses reference counting: the blob row is deleted only when the counter reaches zero, so the same blob can be referenced by multiple items safely.
 
 ---
 
@@ -68,21 +68,21 @@ class SDS_BrowserPersistenceProvider implements SDS_PersistenceProvider {
 ### Offline-first PWA
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_BrowserPersistenceProvider } from '@rozek/sds-persistence-browser'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_BrowserPersistenceProvider('my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_BrowserPersistenceProvider('my-store')
 
 const engine = new SDS_SyncEngine(store, { PersistenceProvider:persistence })
 
 // restores from IndexedDB before resolving — works fully offline
 await engine.start()
 
-const note = store.newNoteAt('text/plain', store.RootNote)
-note.Label = 'Survives a page refresh'
-await note.writeValue('Stored in IndexedDB.')
+const data = store.newItemAt('text/plain', store.RootItem)
+data.Label = 'Survives a page refresh'
+await data.writeValue('Stored in IndexedDB.')
 
 await engine.stop()   // final checkpoint written to IndexedDB
 ```
@@ -90,14 +90,14 @@ await engine.stop()   // final checkpoint written to IndexedDB
 ### With WebSocket sync
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_BrowserPersistenceProvider } from '@rozek/sds-persistence-browser'
 import { SDS_WebSocketProvider }          from '@rozek/sds-network-websocket'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_BrowserPersistenceProvider('my-notes')
-const network = new SDS_WebSocketProvider('my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_BrowserPersistenceProvider('my-store')
+const network = new SDS_WebSocketProvider('my-store')
 
 const engine = new SDS_SyncEngine(store, {
   PersistenceProvider:persistence,
@@ -112,8 +112,8 @@ await engine.connectTo('wss://my-server.example.com', { Token:'<jwt>' })
 ### Multiple independent stores
 
 ```typescript
-// each store gets its own IndexedDB database: sns:notes, sns:tasks, …
-const notesPersistence = new SDS_BrowserPersistenceProvider('notes')
+// each store gets its own IndexedDB database: sns:items, sns:tasks, …
+const dataPersistence = new SDS_BrowserPersistenceProvider('items')
 const tasksPersistence = new SDS_BrowserPersistenceProvider('tasks')
 ```
 

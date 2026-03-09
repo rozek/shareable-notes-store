@@ -1,10 +1,10 @@
 /*******************************************************************************
 *                                                                              *
-*                                  SNS Core                                    *
+*                                  SDS Core                                    *
 *                                                                              *
 *******************************************************************************/
 
-// backend-agnostic shared types and interfaces, consumed by all SNS backend 
+// backend-agnostic shared types and interfaces, consumed by all SDS backend 
 // packages (sds-core-jj, sds-core-yjs, sds-core-loro) and by the infrastructure
 // packages (sync-engine, network, persistence).                                                                
 
@@ -16,7 +16,7 @@ export {
   DefaultBinarySizeLimit, DefaultWrapperCacheSize,
 }                        from './store/constants.js'
 export { SDS_Entry }     from './store/SDS_Entry.js'
-export { SDS_Note }      from './store/SDS_Note.js'
+export { SDS_Item }      from './store/SDS_Item.js'
 export { SDS_Link }      from './store/SDS_Link.js'
 
 export type { SDS_ChangeSet }      from './changeset/SDS_ChangeSet.js'
@@ -24,8 +24,8 @@ export type { SDS_EntryChangeSet } from './changeset/SDS_EntryChangeSet.js'
 
 export type { SDS_SyncCursor, SDS_PatchSeqNumber, SDS_PersistenceProvider }
                                    from './interfaces/SDS_PersistenceProvider.js'
-export type { SDS_NoteStore, ChangeOrigin, ChangeHandler }
-                                   from './interfaces/SDS_NoteStore.js'
+export type { SDS_DataStore, ChangeOrigin, ChangeHandler }
+                                   from './interfaces/SDS_DataStore.js'
 export type {
   SDS_NetworkProvider,
   SDS_ConnectionOptions,

@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                         SNS Core YJS — Y.js backend                          *
+*                         SDS Core YJS — Y.js backend                          *
 *                                                                              *
 * Exports the complete public API for the Y.js CRDT backend.                   *
 * The API surface is intentionally identical to @rozek/sds-core so that        *
@@ -11,10 +11,10 @@
 // Y.js-specific classes (full implementations)
 export { SDS_Error }                from './error/SDS_Error.js'
 export { SDS_Entry }                from './store/SDS_Entry.js'
-export { SDS_Note }                 from './store/SDS_Note.js'
+export { SDS_Item }                 from './store/SDS_Item.js'
 export { SDS_Link }                 from './store/SDS_Link.js'
-export { SDS_NoteStore }            from './store/SDS_NoteStore.js'
-export type { SDS_NoteStoreOptions, ChangeOrigin, ChangeHandler } from './store/SDS_NoteStore.js'
+export { SDS_DataStore }            from './store/SDS_DataStore.js'
+export type { SDS_DataStoreOptions, ChangeOrigin, ChangeHandler } from './store/SDS_DataStore.js'
 
 // changeset types (backend-agnostic — copied locally)
 export type { SDS_ChangeSet }      from './changeset/SDS_ChangeSet.js'

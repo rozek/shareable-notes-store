@@ -13,7 +13,7 @@
 
 | # | Description | Expected |
 |---|---|---|
-| SP-01 | start() calls loadPatchesSince and applies patches to store | `loadPatchesSince` called; patched note is accessible by ID and Label in the target store |
+| SP-01 | start() calls loadPatchesSince and applies patches to store | `loadPatchesSince` called; patched data is accessible by Id and Label in the target store |
 | SP-02 | internal store change calls appendPatch with patch + clock | appendPatch() called once |
 | SP-03 | accumulated bytes ≥ threshold triggers writeCheckpoint | saveSnapshot() + prunePatches() called |
 | SP-04 | stop() calls prunePatches if AccumulatedBytes > 0 | prunePatches() called |
@@ -26,7 +26,7 @@
 | SN-02 | reconnect() without prior connectTo() throws 'not-yet-connected' | throws |
 | SN-03 | when connected, internal store change → network.sendPatch() called | sendPatch() called |
 | SN-04 | when disconnected, internal store change → patch queued; flushes on reconnect | sendPatch() called after reconnect |
-| SN-05 | incoming network patch → applied to store | patched note's Label readable in store after patch delivery |
+| SN-05 | incoming network patch → applied to store | patched data's Label readable in store after patch delivery |
 
 ## SS — Presence
 

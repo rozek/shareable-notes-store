@@ -4,7 +4,7 @@
 
 ## Goal
 
-Verify that `SDS_SyncEngine` correctly coordinates `SDS_NoteStore` with persistence, network, and presence providers across its full lifecycle.
+Verify that `SDS_SyncEngine` correctly coordinates `SDS_DataStore` with persistence, network, and presence providers across its full lifecycle.
 
 ---
 
@@ -63,7 +63,7 @@ Verify that `SDS_SyncEngine` correctly coordinates `SDS_NoteStore` with persiste
 
 #### 1.1 Patch replay from persistence
 
-- **TC-2.1.1** — `start()` calls `loadPatchesSince` and applies the returned patches to the store, making previously created notes accessible by ID and label
+- **TC-2.1.1** — `start()` calls `loadPatchesSince` and applies the returned patches to the store, making previously created items accessible by Id and label
 
 ### 2. Outgoing patch recording
 
@@ -111,7 +111,7 @@ Verify that `SDS_SyncEngine` correctly coordinates `SDS_NoteStore` with persiste
 
 #### 3.1 Remote patch applied to store
 
-- **TC-3.5.1** — An incoming network patch delivered via the `onPatch` callback is applied to the store, making the patched note's label readable
+- **TC-3.5.1** — An incoming network patch delivered via the `onPatch` callback is applied to the store, making the patched data's label readable
 
 ---
 
@@ -132,11 +132,11 @@ Verify that `SDS_SyncEngine` correctly coordinates `SDS_NoteStore` with persiste
 
 #### 2.1 Remote presence change event
 
-- **TC-4.3.1** — An incoming remote state delivered via `onRemoteState` causes every registered `onPresenceChange` handler to be called with the remote peer ID, the state, and the string `'remote'`
+- **TC-4.3.1** — An incoming remote state delivered via `onRemoteState` causes every registered `onPresenceChange` handler to be called with the remote peer Id, the state, and the string `'remote'`
 
 #### 2.2 Peer timeout
 
-- **TC-4.4.1** — After a remote peer's state is received and the configured `PresenceTimeoutMs` elapses without a refresh, `onPresenceChange` is called with the peer ID and `undefined` state, signalling departure
+- **TC-4.4.1** — After a remote peer's state is received and the configured `PresenceTimeoutMs` elapses without a refresh, `onPresenceChange` is called with the peer Id and `undefined` state, signalling departure
 
 ---
 

@@ -1,10 +1,10 @@
 /*******************************************************************************
 *                                                                              *
-*                      SNS Browser Bundle Loro — Entry                         *
+*                      SDS Browser Bundle Loro — Entry                         *
 *                                                                              *
 *******************************************************************************/
 
-// re-exports the complete public API of all SNS packages in one place so that 
+// re-exports the complete public API of all SDS packages in one place so that 
 // Vite / Rollup can bundle everything into a single self-contained ESM file.
 //
 // The CRDT backend used in this bundle is Loro (@rozek/sds-core-loro). 

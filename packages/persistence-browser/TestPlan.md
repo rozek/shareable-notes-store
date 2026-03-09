@@ -17,7 +17,7 @@ Verify that `SDS_BrowserPersistenceProvider` correctly persists and restores sna
 - Value blob save / load / ref-counted release
 
 **Out of scope:**
-- Integration with `SDS_NoteStore` (covered by sync-engine tests)
+- Integration with `SDS_DataStore` (covered by sync-engine tests)
 - Cross-origin or cross-tab isolation (browser policy)
 
 ---

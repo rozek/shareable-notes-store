@@ -100,7 +100,7 @@ docker compose up -d
 
 Use this only if your server has more than 1 GB RAM and you prefer to build the image locally. Building compiles `better-sqlite3` from source via `node-gyp`, which requires build tools and temporarily uses significant RAM.
 
-**Required build tools** (only if `better-sqlite3` has no pre-built binary for your platform — see note in step 4):
+**Required build tools** (only if `better-sqlite3` has no pre-built binary for your platform — see data in step 4):
 
 - Debian / Ubuntu: `apt-get install -y make g++ python3`
 - RHEL / Rocky / AlmaLinux: `dnf install -y make gcc gcc-c++ python3`
@@ -368,7 +368,7 @@ With the admin token you can issue further tokens at runtime, e.g. for individua
 
 ```bash
 ADMIN_TOKEN="<admin-token-from-above>"
-SDS_DOMAIN="notes.example.com"
+SDS_DOMAIN="store.example.com"
 STORE_ID="my-store-42"
 
 curl -s -X POST "https://${SDS_DOMAIN}/api/token" \
@@ -398,9 +398,9 @@ Clients connect to the server via `SDS_SyncEngine`:
 ```ts
 import { SDS_SyncEngine }        from '@rozek/sds-sync-engine'
 import { SDS_WebSocketProvider } from '@rozek/sds-network-websocket'
-import { SDS_NoteStore }         from '@rozek/sds-core-jj'  // or -yjs / -loro
+import { SDS_DataStore }         from '@rozek/sds-core-jj'  // or -yjs / -loro
 
-const Store   = SDS_NoteStore.fromScratch()
+const Store   = SDS_DataStore.fromScratch()
 const Token   = '<jwt-token-with-write-scope>'
 const StoreId = 'my-store-42'
 
@@ -483,8 +483,8 @@ docker compose up -d
 
 ```bash
 echo | openssl s_client \
-  -connect notes.example.com:443 \
-  -servername notes.example.com 2>/dev/null \
+  -connect store.example.com:443 \
+  -servername store.example.com 2>/dev/null \
   | openssl x509 -noout -dates
 ```
 

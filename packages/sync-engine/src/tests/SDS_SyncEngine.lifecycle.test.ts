@@ -5,7 +5,7 @@
 *******************************************************************************/
 
 import { describe, it, expect, vi } from 'vitest'
-import { SDS_NoteStore }             from '@rozek/sds-core-jj'
+import { SDS_DataStore }             from '@rozek/sds-core-jj'
 import { SDS_SyncEngine }            from '../sds-sync-engine.js'
 
 /**** makeMockPersistence — creates a fully-mocked persistence provider ****/
@@ -29,7 +29,7 @@ function makeMockPersistence () {
 function makeMockNetwork (storeId = 'store-1') {
   const handlers: Record<string, Function[]> = { patch:[], value:[], conn:[] }
   return {
-    StoreID: storeId,
+    StoreId: storeId,
     get ConnectionState () { return 'disconnected' as const },
     connect:          vi.fn().mockResolvedValue(undefined),
     disconnect:       vi.fn(),
@@ -54,21 +54,21 @@ function makeMockNetwork (storeId = 'store-1') {
 describe('SDS_SyncEngine — Lifecycle', () => {
 
   it('SL-01: construct without options succeeds', () => {
-    const Store  = SDS_NoteStore.fromScratch()
+    const Store  = SDS_DataStore.fromScratch()
     const Engine = new SDS_SyncEngine(Store)
     expect(Engine).toBeDefined()
     expect(Engine.PeerId).toBeTruthy()
   })
 
   it('SL-02: start() with no providers succeeds', async () => {
-    const Store  = SDS_NoteStore.fromScratch()
+    const Store  = SDS_DataStore.fromScratch()
     const Engine = new SDS_SyncEngine(Store)
     await expect(Engine.start()).resolves.toBeUndefined()
     await Engine.stop()
   })
 
   it('SL-03: stop() calls persistence.close() and network.disconnect()', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Persist = makeMockPersistence()
     const Network = makeMockNetwork()
     const Engine  = new SDS_SyncEngine(Store, {
@@ -82,14 +82,14 @@ describe('SDS_SyncEngine — Lifecycle', () => {
   })
 
   it('SL-04: stop() writes checkpoint if accumulated bytes > 0', async () => {
-    const Store   = SDS_NoteStore.fromScratch()
+    const Store   = SDS_DataStore.fromScratch()
     const Persist = makeMockPersistence()
     const Engine  = new SDS_SyncEngine(Store, {
       PersistenceProvider: Persist,
     })
     await Engine.start()
     // Force a change to accumulate bytes
-    Store.newNoteAt(Store.RootNote)
+    Store.newItemAt(Store.RootItem)
     await Engine.stop()
     // saveSnapshot should have been called either during accumulation or at stop
     // (depends on threshold; just verify no exception)

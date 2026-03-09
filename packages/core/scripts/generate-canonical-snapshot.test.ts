@@ -4,14 +4,14 @@
  * ║                                                                          ║
  * ║  This script generates a NEW canonical empty snapshot.  Running it      ║
  * ║  and copying its output into canonical-empty-snapshot.ts will change    ║
- * ║  the internal json-joy CRDT node-ID space that ALL peers share.         ║
+ * ║  the internal json-joy CRDT node-Id space that ALL peers share.         ║
  * ║                                                                          ║
  * ║  Consequence: every existing persisted store and every stored patch      ║
  * ║  becomes PERMANENTLY INCOMPATIBLE with stores built from the new         ║
  * ║  snapshot.  There is no automatic migration path.                        ║
  * ║                                                                          ║
  * ║  Only run this when ALL of the following are true:                       ║
- * ║    1. The SNS entry schema has changed (new top-level CRDT fields).      ║
+ * ║    1. The SDS entry schema has changed (new top-level CRDT fields).      ║
  * ║    2. You accept that all existing persisted data will be abandoned.     ║
  * ║    3. You have coordinated the change with all active deployments.       ║
  * ║                                                                          ║
@@ -25,7 +25,7 @@
  * ║  src/store/canonical-empty-snapshot.ts.                                  ║
  * ╚══════════════════════════════════════════════════════════════════════════╝
  *
- * WHY this script bypasses SDS_NoteStore.fromScratch()
+ * WHY this script bypasses SDS_DataStore.fromScratch()
  * -----------------------------------------------------
  * fromScratch() now delegates to fromBinary(CanonicalEmptySnapshot).
  * Using it here would be circular: the output would just be a re-compressed
@@ -50,23 +50,23 @@ describe('DANGER: generate NEW canonical empty snapshot', () => {
     Model_.api.root(Schema.obj({
       Entries: Schema.obj({
         [RootId]: Schema.obj({
-          Kind:     Schema.con('note'),
+          Kind:     Schema.con('item'),
           Label:    Schema.val(Schema.str('')),
           Info:     Schema.obj({}),
           MIMEType: Schema.val(Schema.str('')),
           ValueKind:Schema.val(Schema.str('none')),
         }),
         [TrashId]: Schema.obj({
-          Kind:          Schema.con('note'),
-          outerPlacement:Schema.val(Schema.con({ outerNoteId: RootId, OrderKey: 'a0' })),
+          Kind:          Schema.con('item'),
+          outerPlacement:Schema.val(Schema.con({ outerItemId: RootId, OrderKey: 'a0' })),
           Label:         Schema.val(Schema.str('trash')),
           Info:          Schema.obj({}),
           MIMEType:      Schema.val(Schema.str('')),
           ValueKind:     Schema.val(Schema.str('none')),
         }),
         [LostAndFoundId]: Schema.obj({
-          Kind:          Schema.con('note'),
-          outerPlacement:Schema.val(Schema.con({ outerNoteId: RootId, OrderKey: 'a1' })),
+          Kind:          Schema.con('item'),
+          outerPlacement:Schema.val(Schema.con({ outerItemId: RootId, OrderKey: 'a1' })),
           Label:         Schema.val(Schema.str('lost-and-found')),
           Info:          Schema.obj({}),
           MIMEType:      Schema.val(Schema.str('')),

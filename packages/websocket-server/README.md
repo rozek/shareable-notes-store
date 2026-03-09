@@ -1,6 +1,6 @@
 # @rozek/sds-websocket-server
 
-The relay server for the **shareable-data-store** (SNS) family. A [Hono](https://hono.dev)-based WebSocket server that:
+The relay server for the **shareable-data-store** (SDS) family. A [Hono](https://hono.dev)-based WebSocket server that:
 
 - authenticates clients with JWT (HS256)
 - relays CRDT patches between connected peers
@@ -42,7 +42,7 @@ import { serve }           from '@hono/node-server'
 const { app:app } = createSDSServer({ JWTSecret:'your-secret-at-least-32-chars' })
 
 serve({ fetch:app.fetch, port:3000 }, () => {
-  console.log('SNS server listening on http://localhost:3000')
+  console.log('SDS server listening on http://localhost:3000')
 })
 ```
 
@@ -98,7 +98,7 @@ Clients connect here to exchange CRDT patches in real time.
 **Authentication:** a JWT is required as the `token` query parameter.
 
 ```
-wss://my-server.example.com/ws/my-notes?token=<jwt>
+wss://my-server.example.com/ws/my-store?token=<jwt>
 ```
 
 **JWT claims:**
@@ -131,7 +131,7 @@ Relays JSON signalling messages (SDP offers/answers, ICE candidates) between pee
 **Authentication:** same JWT `?token=` parameter as the sync endpoint.
 
 ```
-wss://my-server.example.com/signal/my-notes?token=<jwt>
+wss://my-server.example.com/signal/my-store?token=<jwt>
 ```
 
 Messages are JSON objects with a `to` field. The server forwards each message only to the peer identified by `to`.
@@ -151,7 +151,7 @@ Content-Type: application/json
 
 {
   "sub":   "alice",
-  "aud":   "my-notes",
+  "aud":   "my-items",
   "scope": "write",
   "exp":   "1h"
 }
@@ -160,7 +160,7 @@ Content-Type: application/json
 | Field | Required | Description |
 | --- | --- | --- |
 | `sub` | yes | subject (user identifier) |
-| `aud` | yes | audience (store ID) |
+| `aud` | yes | audience (store Id) |
 | `scope` | yes | `'read'`, `'write'`, or `'admin'` |
 | `exp` | no | expiry in [zeit/ms](https://github.com/vercel/ms) format, e.g. `'1h'`, `'7d'` |
 
@@ -223,14 +223,14 @@ import { SignJWT } from 'jose'
 
 const secret = new TextEncoder().encode('super-secret-key-at-least-32-chars!!')
 
-const token = await new SignJWT({ sub:'alice', aud:'my-notes', scope:'write' })
+const token = await new SignJWT({ sub:'alice', aud:'my-store', scope:'write' })
   .setProtectedHeader({ alg:'HS256' })
   .setIssuedAt()
   .setExpirationTime('1h')
   .sign(secret)
 
 // pass this token to the client so it can connect:
-// wss://host/ws/my-notes?token=<token>
+// wss://host/ws/my-store?token=<token>
 ```
 
 ### Behind a reverse proxy (Caddy / nginx)
@@ -252,7 +252,7 @@ my-server.example.com {
 
 The server is protocol-agnostic: it forwards raw binary frames without inspecting the payload (except for the one-byte type prefix used for scope enforcement). The frame format is defined by `@rozek/sds-network-websocket`:
 
-| Byte | Name | Notes |
+| Byte | Name | Description |
 | --- | --- | --- |
 | `0x01` | PATCH | Dropped for read-scope senders |
 | `0x02` | VALUE | Dropped for read-scope senders |

@@ -6,7 +6,7 @@ shared contract; only the import path points to `@rozek/sds-core-yjs`.
 
 ---
 
-## Backend notes
+## Backend items
 
 ### C-11 — Two independent fromScratch() stores can exchange patches
 

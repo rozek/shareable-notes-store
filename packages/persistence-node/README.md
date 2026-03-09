@@ -1,6 +1,6 @@
 # @rozek/sds-persistence-node
 
-SQLite persistence provider for the **shareable-data-store** (SNS) family. Stores CRDT snapshots, incremental patches, and large value blobs in a local SQLite database — suitable for Node.js servers, Electron desktop apps, and Tauri (with a Node.js backend).
+SQLite persistence provider for the **shareable-data-store** (SDS) family. Stores CRDT snapshots, incremental patches, and large value blobs in a local SQLite database — suitable for Node.js servers, Electron desktop apps, and Tauri (with a Node.js backend).
 
 ---
 
@@ -67,19 +67,19 @@ The SQLite file is named `<DbPath>/sns.db`. WAL mode is enabled automatically fo
 ### Standalone — persistence only
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_DesktopPersistenceProvider } from '@rozek/sds-persistence-node'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-store')
 
 const engine = new SDS_SyncEngine(store, { PersistenceProvider:persistence })
 await engine.start()   // restores snapshot + patches from SQLite
 
 // work with the store normally …
-const note = store.newNoteAt('text/plain', store.RootNote)
-note.Label = 'Persisted note'
+const data = store.newItemAt('text/plain', store.RootItem)
+data.Label = 'Persisted data'
 
 await engine.stop()    // flushes final checkpoint and closes the DB
 ```
@@ -87,14 +87,14 @@ await engine.stop()    // flushes final checkpoint and closes the DB
 ### With network sync
 
 ```typescript
-import { SDS_NoteStore }                  from '@rozek/sds-core'
+import { SDS_DataStore }                  from '@rozek/sds-core'
 import { SDS_DesktopPersistenceProvider } from '@rozek/sds-persistence-node'
 import { SDS_WebSocketProvider }          from '@rozek/sds-network-websocket'
 import { SDS_SyncEngine }                 from '@rozek/sds-sync-engine'
 
-const store = SDS_NoteStore.fromScratch()
-const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-notes')
-const network = new SDS_WebSocketProvider('my-notes')
+const store = SDS_DataStore.fromScratch()
+const persistence = new SDS_DesktopPersistenceProvider('./data', 'my-store')
+const network = new SDS_WebSocketProvider('my-store')
 
 const engine = new SDS_SyncEngine(store, {
   PersistenceProvider:persistence,

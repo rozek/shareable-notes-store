@@ -5,7 +5,7 @@
 *******************************************************************************/
 
 import { describe, it, expect, vi } from 'vitest'
-import { SDS_NoteStore }             from '@rozek/sds-core-jj'
+import { SDS_DataStore }             from '@rozek/sds-core-jj'
 import { SDS_SyncEngine }            from '../sds-sync-engine.js'
 
 /**** makeMockPresence — creates a mocked presence provider with trigger helper ****/
@@ -32,7 +32,7 @@ function makeMockPresence () {
 describe('SDS_SyncEngine — Presence', () => {
 
   it('SS-01: setPresenceTo() calls presence.sendLocalState()', async () => {
-    const Store    = SDS_NoteStore.fromScratch()
+    const Store    = SDS_DataStore.fromScratch()
     const Presence = makeMockPresence()
     const Engine   = new SDS_SyncEngine(Store, { PresenceProvider:Presence as any })
     await Engine.start()
@@ -42,7 +42,7 @@ describe('SDS_SyncEngine — Presence', () => {
   })
 
   it('SS-02: setPresenceTo fires onPresenceChange with local origin', async () => {
-    const Store    = SDS_NoteStore.fromScratch()
+    const Store    = SDS_DataStore.fromScratch()
     const Presence = makeMockPresence()
     const Engine   = new SDS_SyncEngine(Store, { PresenceProvider:Presence as any })
     await Engine.start()
@@ -58,7 +58,7 @@ describe('SDS_SyncEngine — Presence', () => {
   })
 
   it('SS-03: incoming remote presence triggers onPresenceChange with remote origin', async () => {
-    const Store    = SDS_NoteStore.fromScratch()
+    const Store    = SDS_DataStore.fromScratch()
     const Presence = makeMockPresence()
     const Engine   = new SDS_SyncEngine(Store, { PresenceProvider:Presence as any })
     await Engine.start()
@@ -74,7 +74,7 @@ describe('SDS_SyncEngine — Presence', () => {
   })
 
   it('SS-05: setPresenceTo with custom field passes custom data to sendLocalState', async () => {
-    const Store    = SDS_NoteStore.fromScratch()
+    const Store    = SDS_DataStore.fromScratch()
     const Presence = makeMockPresence()
     const Engine   = new SDS_SyncEngine(Store, { PresenceProvider:Presence as any })
     await Engine.start()
@@ -87,7 +87,7 @@ describe('SDS_SyncEngine — Presence', () => {
 
   it('SS-04: peer timeout fires onPresenceChange with undefined state', async () => {
     vi.useFakeTimers()
-    const Store    = SDS_NoteStore.fromScratch()
+    const Store    = SDS_DataStore.fromScratch()
     const Presence = makeMockPresence()
     const Engine   = new SDS_SyncEngine(Store, {
       PresenceProvider:  Presence as any,

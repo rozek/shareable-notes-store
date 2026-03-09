@@ -4,7 +4,7 @@
 
 ## Goal
 
-Verify that the SNS WebSocket server correctly authenticates clients, relays CRDT frames, enforces scope restrictions, and issues tokens via the admin API.
+Verify that the SDS WebSocket server correctly authenticates clients, relays CRDT frames, enforces scope restrictions, and issues tokens via the admin API.
 
 ---
 

@@ -1,6 +1,6 @@
 # Test Plan — `@rozek/sds-core-yjs`
 
-This package implements the full SDS_NoteStore contract defined in
+This package implements the full SDS_DataStore contract defined in
 [`@rozek/sds-core` TestPlan.md](../core/TestPlan.md).
 
 All Parts I–XIII of the shared contract apply.  The sections below document

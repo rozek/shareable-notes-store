@@ -1,10 +1,10 @@
 /*******************************************************************************
 *                                                                              *
-*                             SNS Sync Engine                                  *
+*                             SDS Sync Engine                                  *
 *                                                                              *
 *******************************************************************************/
 
-// SDS_SyncEngine coordinates SDS_NoteStore ↔ SDS_PersistenceProvider
+// SDS_SyncEngine coordinates SDS_DataStore ↔ SDS_PersistenceProvider
 // ↔ SDS_NetworkProvider ↔ SDS_PresenceProvider in a single place.
 //
 // Responsibilities:
@@ -16,7 +16,7 @@
 //  - BroadcastChannel (Browser/Tauri only): cross-tab patch + presence relay
 
 import type {
-  SDS_NoteStore,
+  SDS_DataStore,
   SDS_PersistenceProvider,
   SDS_NetworkProvider,
   SDS_PresenceProvider,
@@ -48,7 +48,7 @@ export interface SDS_SyncEngineOptions {
 const CheckpointThreshold = 512*1024  // 512 KB of accumulated patch bytes
 
 export class SDS_SyncEngine {
-  #Store:              SDS_NoteStore
+  #Store:              SDS_DataStore
   #Persistence:        SDS_PersistenceProvider | undefined
   #Network:            SDS_NetworkProvider | undefined
   #Presence:           SDS_PresenceProvider | undefined
@@ -68,7 +68,7 @@ export class SDS_SyncEngine {
   // CRDT cursor captured after the last processed local change;
   // passed to Store.exportPatch() to retrieve exactly that one change.
   // Initialised to an empty cursor; updated in #loadAndRestore and after
-  // each local mutation.  Backend-agnostic: the NoteStore owns the format.
+  // each local mutation.  Backend-agnostic: the DataStore owns the format.
   #LastCursor: SDS_SyncCursor = new Uint8Array(0)
 
   // heartbeat timer
@@ -96,7 +96,7 @@ export class SDS_SyncEngine {
 //                                Constructor                                 //
 //----------------------------------------------------------------------------//
 
-  constructor (Store:SDS_NoteStore, Options:SDS_SyncEngineOptions = {}) {
+  constructor (Store:SDS_DataStore, Options:SDS_SyncEngineOptions = {}) {
     this.#Store       = Store
     this.#Persistence = Options.PersistenceProvider ?? undefined
     this.#Network     = Options.NetworkProvider     ?? undefined
@@ -110,7 +110,7 @@ export class SDS_SyncEngine {
       typeof BroadcastChannel !== 'undefined'
 
     if (useBroadcastChannel && this.#Network != undefined) {
-      this.#BC = new BroadcastChannel(`sns:${this.#Network.StoreID}`)
+      this.#BC = new BroadcastChannel(`sns:${this.#Network.StoreId}`)
     }
   }
 
@@ -257,10 +257,10 @@ export class SDS_SyncEngine {
         // instead of creating a new store, we apply patches on top of the existing empty store
         // by exporting a full patch from the loaded snapshot store and applying to this.#Store.
         // Simpler approach: use the snapshot binary directly as first patch
-        // (The SDS_NoteStore.fromBinary wraps the model; we can't replace the store.)
+        // (The SDS_DataStore.fromBinary wraps the model; we can't replace the store.)
         // The SyncEngine must be given a freshly created store here.
         // We apply the snapshot as an "import" by getting its binary model data.
-        // SDS_NoteStore exposes applyRemotePatch; snapshot binary is not a patch.
+        // SDS_DataStore exposes applyRemotePatch; snapshot binary is not a patch.
         // → Use asBinary/fromBinary at construction time instead (outside SyncEngine).
         // Here: just apply patches since clock 0.
       } catch (_Signal) {}

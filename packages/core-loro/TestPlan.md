@@ -1,6 +1,6 @@
 # Test Plan — `@rozek/sds-core-loro`
 
-This package implements the full SDS_NoteStore contract defined in
+This package implements the full SDS_DataStore contract defined in
 [`@rozek/sds-core` TestPlan.md](../core/TestPlan.md).
 
 All Parts I–XIII of the shared contract apply.  The sections below document
@@ -48,7 +48,7 @@ the json-joy backend for every contract test case.
   values are stored as plain `Uint8Array` entries in `LoroMap`.
 
 - **Purge implementation** — `purgeEntry()` uses tombstoning (sets
-  `outerNoteId` to `''`) rather than deleting the map key, ensuring CRDT
+  `outerItemId` to `''`) rather than deleting the map key, ensuring CRDT
   consistency across peers.
 
 - **Transactions** — modelled via a depth counter (`#TransactDepth`); Loro's

@@ -1,6 +1,6 @@
 /*******************************************************************************
 *                                                                              *
-*                  SNS WebSocket Server — Auth Tests                           *
+*                  SDS WebSocket Server — Auth Tests                           *
 *                                                                              *
 *******************************************************************************/
 
@@ -28,7 +28,7 @@
 //                                   Tests                                    //
 //----------------------------------------------------------------------------//
 
-  describe('SNS WebSocket Server — Auth', () => {
+  describe('SDS WebSocket Server — Auth', () => {
     const { app } = createSDSServer({ JWTSecret:SECRET_STR })
 
     it('SA-01: missing token returns 401 on HTTP upgrade request', async () => {
