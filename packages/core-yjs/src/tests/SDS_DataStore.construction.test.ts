@@ -46,7 +46,7 @@ describe('SDS_DataStore (Y.js) — Construction', () => {
 
   it('C-06: fromBinary(asBinary()) round-trips correctly', () => {
     const Store1 = SDS_DataStore.fromScratch()
-    const Item1  = Store1.newItemAt(Store1.RootItem)
+    const Item1  = Store1.newItemAt(undefined, Store1.RootItem)
       Item1.Label = 'round-trip data'
     const Binary = Store1.asBinary()
     const Store2 = SDS_DataStore.fromBinary(Binary)
@@ -71,14 +71,14 @@ describe('SDS_DataStore (Y.js) — Construction', () => {
 
   it('C-09: small strings stored as literal when within LiteralSizeLimit', () => {
     const Store = SDS_DataStore.fromScratch({ LiteralSizeLimit:1000 })
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Item.writeValue('hello')
     expect(Item.ValueKind).toBe('literal')
   })
 
   it('C-10: strings beyond LiteralSizeLimit stored as literal-reference', () => {
     const Store = SDS_DataStore.fromScratch({ LiteralSizeLimit:3 })
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Item.writeValue('hello')  // 5 chars > 3
     expect(Item.ValueKind).toBe('literal-reference')
   })
@@ -102,7 +102,7 @@ describe('SDS_DataStore (Y.js) — Construction', () => {
     const StoreA = SDS_DataStore.fromScratch()
     const StoreB = SDS_DataStore.fromScratch()
 
-    const Item = StoreA.newItemAt(StoreA.RootItem)
+    const Item = StoreA.newItemAt(undefined, StoreA.RootItem)
     Item.Label  = 'shared across peers'
 
     const Patch = StoreA.exportPatch()

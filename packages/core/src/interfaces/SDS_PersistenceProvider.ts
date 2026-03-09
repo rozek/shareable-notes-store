@@ -16,13 +16,13 @@
 // SDS_SyncCursor is used exclusively by SDS_DataStore.exportPatch() and
 // SDS_DataStore.currentCursor — not by SDS_PersistenceProvider.
 
-export type SDS_SyncCursor = Uint8Array
+  export type SDS_SyncCursor = Uint8Array
 
 // SDS_PatchSeqNumber is a plain integer maintained by SDS_SyncEngine. It counts 
 // patches appended since the last checkpoint and serves as the ordering key in 
 // the persistence layer. It is entirely independent of the CRDT backend's cursor
 // format.
-export type SDS_PatchSeqNumber = number
+  export type SDS_PatchSeqNumber = number
 
 export interface SDS_PersistenceProvider {
 

@@ -15,15 +15,15 @@ import { SDS_Error }     from '@rozek/sds-core'
 describe('SDS_DataStore — Delete & Purge', () => {
   it('D-01: deleteEntry moves data to TrashItem', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Store.deleteEntry(Item)
     expect(Item.outerItem?.Id).toBe(Store.TrashItem.Id)
   })
 
   it('D-02: deleted data\'s children are also in trash hierarchy', () => {
     const Store  = SDS_DataStore.fromScratch()
-    const OuterItem = Store.newItemAt(Store.RootItem)
-    const InnerItem = Store.newItemAt(OuterItem)
+    const OuterItem = Store.newItemAt(undefined, Store.RootItem)
+    const InnerItem = Store.newItemAt(undefined, OuterItem)
     Store.deleteEntry(OuterItem)
     // outerItem should be directly in Trash
     expect(OuterItem.outerItem?.Id).toBe(Store.TrashItem.Id)
@@ -33,7 +33,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-03: deleteEntry fires ChangeSet with outerItem and innerEntryList', () => {
     const Store   = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
     Store.deleteEntry(Item)
@@ -45,35 +45,35 @@ describe('SDS_DataStore — Delete & Purge', () => {
   it('D-04: deleteEntry(RootItem) throws delete-not-permitted', () => {
     const Store = SDS_DataStore.fromScratch()
     expect(() => Store.deleteEntry(Store.RootItem)).toThrowError(
-      expect.objectContaining({ Code:'delete-not-permitted' })
+      expect.objectContaining({ code:'delete-not-permitted' })
     )
   })
 
   it('D-05: deleteEntry(TrashItem) throws', () => {
     const Store = SDS_DataStore.fromScratch()
     expect(() => Store.deleteEntry(Store.TrashItem)).toThrowError(
-      expect.objectContaining({ Code:'delete-not-permitted' })
+      expect.objectContaining({ code:'delete-not-permitted' })
     )
   })
 
   it('D-06: deleteEntry(LostAndFoundItem) throws', () => {
     const Store = SDS_DataStore.fromScratch()
     expect(() => Store.deleteEntry(Store.LostAndFoundItem)).toThrowError(
-      expect.objectContaining({ Code:'delete-not-permitted' })
+      expect.objectContaining({ code:'delete-not-permitted' })
     )
   })
 
   it('D-07: purgeEntry on data not in TrashItem throws purge-not-in-trash', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     expect(() => Store.purgeEntry(Item)).toThrowError(
-      expect.objectContaining({ Code:'purge-not-in-trash' })
+      expect.objectContaining({ code:'purge-not-in-trash' })
     )
   })
 
   it('D-08: purgeEntry removes data from store', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Store.deleteEntry(Item)
     Store.purgeEntry(Item)
     expect(Store.EntryWithId(Item.Id)).toBeUndefined()
@@ -81,27 +81,27 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-09: purgeEntry throws purge-protected when data has incoming link from RootItem tree', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Store.newLinkAt(Item, Store.RootItem)   // link in root tree points to Data
     Store.deleteEntry(Item)                  // data is in Trash
     expect(() => Store.purgeEntry(Item)).toThrowError(
-      expect.objectContaining({ Code:'purge-protected' })
+      expect.objectContaining({ code:'purge-protected' })
     )
     expect(Store.EntryWithId(Item.Id)).toBeDefined()  // still exists
   })
 
   it('D-12: data.delete() equivalent to store.deleteEntry(data)', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Item.delete()
     expect(Item.outerItem?.Id).toBe(Store.TrashItem.Id)
   })
 
   it('D-13: data.purge() throws if data not in Trash', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     expect(() => Item.purge()).toThrowError(
-      expect.objectContaining({ Code:'purge-not-in-trash' })
+      expect.objectContaining({ code:'purge-not-in-trash' })
     )
   })
 
@@ -111,7 +111,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-14: deleteEntry records _trashedAt in Info with a timestamp ≥ the time before the call', () => {
     const Store  = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     const Before = Date.now()
     Store.deleteEntry(Item)
     const TrashedAt = Item.Info['_trashedAt'] as number
@@ -123,7 +123,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
     vi.useFakeTimers()
     try {
       const Store = SDS_DataStore.fromScratch()
-      const Item = Store.newItemAt(Store.RootItem)
+      const Item = Store.newItemAt(undefined, Store.RootItem)
       vi.setSystemTime(new Date(Date.now() - 90_000))  // 90 s in the past
       Store.deleteEntry(Item)
       vi.setSystemTime(new Date(Date.now() + 90_000))  // restore to now
@@ -138,7 +138,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-16: purgeExpiredTrashEntries skips entries whose _trashedAt is within the TTL', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Store.deleteEntry(Item)  // _trashedAt ≈ now
 
     const Count = Store.purgeExpiredTrashEntries(86_400_000)  // TTL = 1 day
@@ -148,7 +148,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-17: purgeExpiredTrashEntries skips entries without _trashedAt', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     // move to Trash without going through deleteEntry (bypasses _trashedAt recording)
     Store.moveEntryTo(Item, Store.TrashItem)
 
@@ -161,7 +161,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
     vi.useFakeTimers()
     try {
       const Store = SDS_DataStore.fromScratch()
-      const Item = Store.newItemAt(Store.RootItem)
+      const Item = Store.newItemAt(undefined, Store.RootItem)
       Store.newLinkAt(Item, Store.RootItem)  // link in root tree → Data is protected
 
       vi.setSystemTime(new Date(Date.now() - 90_000))
@@ -181,8 +181,8 @@ describe('SDS_DataStore — Delete & Purge', () => {
     vi.useFakeTimers()
     try {
       const Store = SDS_DataStore.fromScratch()
-      const ItemA = Store.newItemAt(Store.RootItem)
-      const ItemB = Store.newItemAt(Store.RootItem)
+      const ItemA = Store.newItemAt(undefined, Store.RootItem)
+      const ItemB = Store.newItemAt(undefined, Store.RootItem)
       vi.setSystemTime(new Date(Date.now() - 90_000))
       Store.deleteEntry(ItemA)
       Store.deleteEntry(ItemB)
@@ -223,7 +223,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
     vi.useFakeTimers()
     try {
       const Store = SDS_DataStore.fromScratch({ TrashTTLms:60_000, TrashCheckIntervalMs:500 })
-      const Item = Store.newItemAt(Store.RootItem)
+      const Item = Store.newItemAt(undefined, Store.RootItem)
 
       // simulate data deleted in the past
       vi.setSystemTime(new Date(Date.now() - 90_000))
@@ -241,7 +241,7 @@ describe('SDS_DataStore — Delete & Purge', () => {
 
   it('D-22: moving an entry out of TrashItem removes Info._trashedAt', () => {
     const Store = SDS_DataStore.fromScratch()
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     Store.deleteEntry(Item)
     expect(typeof Item.Info['_trashedAt']).toBe('number')  // set by deleteEntry
     Store.moveEntryTo(Item, Store.RootItem)                // move back out of trash

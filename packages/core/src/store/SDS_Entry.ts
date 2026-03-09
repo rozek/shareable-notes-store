@@ -4,18 +4,16 @@
 *                                                                              *
 *******************************************************************************/
 
-import type { SDS_DataStore } from '../interfaces/SDS_DataStore.js'
-import type { SDS_Item }      from './SDS_Item.js'
-import { RootId, TrashId, LostAndFoundId } from './constants.js'
-
-// allows bracket-notation access to internal store methods not declared on the
-// minimal SDS_DataStore interface, while keeping the constructor type-safe
-
-type StoreBackend = SDS_DataStore & Record<string, any>
+import { SDS_DataStore }             from './SDS_DataStore.js'
+import type { SDS_EntryJSON }        from './SDS_DataStore.js'
+import type { SDS_Item }             from './SDS_Item.js'
+import { RootId, TrashId, LostAndFoundId } from './SDS_Constants.js'
+import { SDS_Error }                 from '../error/SDS_Error.js'
+import { validateLabel }             from './SDS_Validation.js'
 
 export class SDS_Entry {
   constructor (
-    protected readonly _Store:StoreBackend,
+    protected readonly _Store:SDS_DataStore,
     readonly Id:string,
   ) {}
 
@@ -28,8 +26,8 @@ export class SDS_Entry {
   get isRootItem ():         boolean { return this.Id === RootId }
   get isTrashItem ():        boolean { return this.Id === TrashId }
   get isLostAndFoundItem (): boolean { return this.Id === LostAndFoundId }
-  get isItem ():             boolean { return this._Store['_KindOf'](this.Id) === 'item' }
-  get isLink ():             boolean { return this._Store['_KindOf'](this.Id) === 'link' }
+  get isItem ():             boolean { return this._Store._KindOf(this.Id) === 'item' }
+  get isLink ():             boolean { return this._Store._KindOf(this.Id) === 'link' }
 
 //----------------------------------------------------------------------------//
 //                                 Hierarchy                                  //
@@ -38,19 +36,19 @@ export class SDS_Entry {
 /**** outerItem / outerItemId / outerItemChain / outerItemIds ****/
 
   get outerItem ():SDS_Item | undefined {
-    return this._Store['_outerItemOf'](this.Id)
+    return this._Store._outerItemOf(this.Id)
   }
 
   get outerItemId ():string | undefined {
-    return this._Store['_outerItemIdOf'](this.Id)
+    return this._Store._outerItemIdOf(this.Id)
   }
 
   get outerItemChain ():SDS_Item[] {
-    return this._Store['_outerItemChainOf'](this.Id)
+    return this._Store._outerItemChainOf(this.Id)
   }
 
   get outerItemIds ():string[] {
-    return this._Store['_outerItemIdsOf'](this.Id)
+    return this._Store._outerItemIdsOf(this.Id)
   }
 
 //----------------------------------------------------------------------------//
@@ -59,11 +57,14 @@ export class SDS_Entry {
 
 /**** Label / Info ****/
 
-  get Label ():string       { return this._Store['_LabelOf'](this.Id) }
-  set Label (Value:string)  { this._Store['_setLabelOf'](this.Id, Value) }
+  get Label ():string      { return this._Store._LabelOf(this.Id) }
+  set Label (Value:string) {
+    validateLabel(Value)
+    this._Store._setLabelOf(this.Id, Value)
+  }
 
   get Info ():Record<string,unknown> {
-    return this._Store['_InfoProxyOf'](this.Id)
+    return this._Store._InfoProxyOf(this.Id)
   }
 
 //----------------------------------------------------------------------------//
@@ -72,39 +73,45 @@ export class SDS_Entry {
 
 /**** mayBeMovedTo ****/
 
-  mayBeMovedTo (OuterItem:SDS_Item, InsertionIndex?:number):boolean {
-    return this._Store['_mayMoveEntryTo'](this.Id, OuterItem.Id, InsertionIndex)
+  mayBeMovedTo (outerItem:SDS_Item, InsertionIndex?:number):boolean {
+    if (outerItem == null) throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    return this._Store._mayMoveEntryTo(this.Id, outerItem.Id, InsertionIndex)
   }
 
 /**** moveTo ****/
 
-  moveTo (OuterItem:SDS_Item, InsertionIndex?:number):void {
-    this._Store['moveEntryTo'](this, OuterItem, InsertionIndex)
+  moveTo (outerItem:SDS_Item, InsertionIndex?:number):void {
+    if (outerItem == null) throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    this._Store.moveEntryTo(this, outerItem, InsertionIndex)
   }
 
 //----------------------------------------------------------------------------//
-//                                  Delete                                    //
+//                                   Delete                                   //
 //----------------------------------------------------------------------------//
 
 /**** mayBeDeleted ****/
 
   get mayBeDeleted ():boolean {
-    return this._Store['_mayDeleteEntry'](this.Id)
+    return this._Store._mayDeleteEntry(this.Id)
   }
 
 /**** delete ****/
 
-  delete ():void { this._Store['deleteEntry'](this) }
+  delete ():void { this._Store.deleteEntry(this) }
 
 /**** purge ****/
 
-  purge ():void  { this._Store['purgeEntry'](this) }
+  purge ():void  { this._Store.purgeEntry(this) }
 
 //----------------------------------------------------------------------------//
-//                              Serialisation                                 //
+//                               Serialisation                                //
 //----------------------------------------------------------------------------//
 
-/**** asJSON ****/
+/**** asJSON — serialise this entry and its subtree as a plain JSON object ****/
 
-  asJSON ():unknown { return this._Store['_EntryAsJSON'](this.Id) }
+  asJSON ():SDS_EntryJSON { return this._Store._EntryAsJSON(this.Id) }
+
+/**** asBinary — serialise this entry and its subtree as a gzip-compressed binary ****/
+
+  asBinary ():Uint8Array { return this._Store._EntryAsBinary(this.Id) }
 }

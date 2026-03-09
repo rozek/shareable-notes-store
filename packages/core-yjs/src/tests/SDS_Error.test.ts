@@ -15,7 +15,7 @@ describe('SDS_Error', () => {
 
   it('E-01: has the given Code and message', () => {
     const Err = new SDS_Error('foo', 'bar message')
-    expect(Err.Code).toBe('foo')
+    expect(Err.code).toBe('foo')
     expect(Err.message).toBe('bar message')
     expect(Err).toBeInstanceOf(Error)
   })

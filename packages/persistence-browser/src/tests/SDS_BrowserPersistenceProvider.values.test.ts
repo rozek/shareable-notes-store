@@ -25,7 +25,7 @@ describe('SDS_BrowserPersistenceProvider — Values', () => {
   })
 
   it('BV-02: saveValue then loadValue returns same bytes', async () => {
-    const Item = new Uint8Array([10, 20, 30])
+    const Data = new Uint8Array([10, 20, 30])
     await Provider.saveValue('sha256-abc', Data)
     const Loaded = await Provider.loadValue('sha256-abc')
     expect(Array.from(Loaded!)).toEqual([10, 20, 30])
@@ -33,7 +33,7 @@ describe('SDS_BrowserPersistenceProvider — Values', () => {
   })
 
   it('BV-03: saveValue same hash twice; two releaseValue calls delete row', async () => {
-    const Item = new Uint8Array([1, 2, 3])
+    const Data = new Uint8Array([1, 2, 3])
     await Provider.saveValue('sha256-x', Data)
     await Provider.saveValue('sha256-x', Data)
     await Provider.releaseValue('sha256-x')

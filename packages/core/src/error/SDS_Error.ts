@@ -5,11 +5,11 @@
 *******************************************************************************/
 
 export class SDS_Error extends Error {
-  readonly Code:string
+  readonly code:string
 
   constructor (Code:string, Message:string) {
     super(Message)
-    this.Code = Code
+    this.code = Code
     this.name = 'SDS_Error'
   }
 }

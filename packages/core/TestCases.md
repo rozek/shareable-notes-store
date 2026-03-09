@@ -10,7 +10,7 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 
 | # | Test case | Expected result |
 |---|---|---|
-| E-01 | `new SDS_Error('foo', 'bar message')` | `err.Code === 'foo'`, `err.message === 'bar message'`, `err instanceof Error` |
+| E-01 | `new SDS_Error('foo', 'bar message')` | `err.code === 'foo'`, `err.message === 'bar message'`, `err instanceof Error` |
 | E-02 | `err.name` | `'SDS_Error'` |
 | E-03 | `err instanceof SDS_Error` | `true` |
 
@@ -68,9 +68,10 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | N-07 | link appears in `RootItem.innerEntryList` | inner list contains link.Id |
 | N-08 | `EntryWithId(data.Id)` returns the data | `result?.Id === data.Id` |
 | N-09 | `EntryWithId('nonexistent-id')` | `undefined` |
-| N-10 | `newItemAt` with invalid MIMEType (empty string) throws `SDS_Error('invalid-argument')` | throws with `Code === 'invalid-argument'` |
+| N-10 | `newItemAt` with invalid MIMEType (empty string) throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
 | N-11 | `newLinkAt` with non-existent target throws | throws `SDS_Error` |
-| N-12 | `newItemAt` with non-data container throws | throws `SDS_Error` |
+| N-12 | `newItemAt` with `null` outerItem throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
+| N-13 | `newLinkAt` with `null` Target throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
 
 ---
 
@@ -86,7 +87,9 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | L-06 | Info set fires ChangeSet with `'Info.tag'` | ChangeSet includes `data.Id → {'Info.tag'}` |
 | L-07 | `delete data.Info['tag']` removes key | `data.Info['tag'] === undefined` |
 | L-08 | Info delete fires ChangeSet with `'Info.tag'` | ChangeSet includes `data.Id → {'Info.tag'}` |
-| L-09 | Label setter with non-string throws `SDS_Error('invalid-argument')` | throws |
+| L-09 | deleting the last Info key removes the Info node; proxy still returns `{}` and writing afterwards works | `Object.keys(Info).length === 0`; subsequent write succeeds |
+| L-10 | `Label` setter with non-string argument throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
+| L-11 | assigning `undefined` to an Info key deletes the key | key absent from `Object.keys(Info)` afterwards |
 
 ---
 
@@ -109,6 +112,12 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | V-13 | `changeValue()` on non-literal throws `SDS_Error('change-value-not-literal')` | throws |
 | V-14 | value change fires ChangeSet with `'Value'` | ChangeSet includes `data.Id → {'Value'}` |
 | V-15 | `writeValue(undefined)` on existing value → `ValueKind === 'none'` | `true` |
+| V-16 | `writeValue` with a wrong-type argument (e.g. `42`) throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
+| V-17 | large string round-trip: `readValue()` after `writeValue(string > LiteralSizeLimit)` returns the full string | resolves to original string |
+| V-18 | large binary round-trip: `readValue()` after `writeValue(Uint8Array > 2KB)` returns the full `Uint8Array` | resolves to equal bytes |
+| V-19 | `changeValue(-1, 2, 'x')` — negative `fromIndex` throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
+| V-20 | `changeValue(3, 2, 'x')` — `toIndex < fromIndex` throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
+| V-21 | `changeValue(0, 2, 42)` — non-string replacement throws `SDS_Error('invalid-argument')` | throws with `code === 'invalid-argument'` |
 
 ---
 
@@ -181,8 +190,11 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | S-04 | round-tripped store has same innerEntryList order | inner-entry order preserved |
 | S-05 | round-tripped store preserves literal value | `readValue()` returns same string |
 | S-06 | round-tripped store preserves binary value | `readValue()` returns equal `Uint8Array` |
-| S-07 | `fromJSON(store.asJSON())` round-trips | all IDs match |
+| S-07 | `fromJSON(store.asJSON())` round-trips — preserves all entry IDs | item created before serialisation is found by original Id in restored store |
 | S-08 | binary round-trip of store with nested items | deeply nested structure preserved |
+| S-09 | `asJSON()` returns a plain JS object | `typeof store.asJSON() === 'object'`; `Kind === 'item'` |
+| S-10 | `fromJSON(store.asJSON())` preserves literal value | `readValue()` returns same string after JSON round-trip |
+| S-11 | `fromJSON(store.asJSON())` preserves binary value | `readValue()` returns equal `Uint8Array` after JSON round-trip |
 
 ---
 
@@ -229,3 +241,4 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | I-05 | nested items are imported with their structure | inner-entry count matches |
 | I-06 | `deserializeLinkInto(link.asJSON(), RootItem)` imports the link | new link in RootItem's inner list |
 | I-07 | invalid serialisation throws `SDS_Error('invalid-argument')` | throws |
+| I-08 | imported item preserves literal value | `readValue()` returns same string as in source item |

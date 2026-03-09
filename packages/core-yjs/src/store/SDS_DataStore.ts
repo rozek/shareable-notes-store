@@ -24,16 +24,20 @@
 import * as Y                    from 'yjs'
 import { z }                     from 'zod'
 import { gzipSync, gunzipSync }  from 'fflate'
-import { generateKeyBetween }    from 'fractional-indexing'
+import { generateKeyBetween, generateNKeysBetween }    from 'fractional-indexing'
 import { SDS_Error }             from '../error/SDS_Error.js'
-import { SDS_Entry }             from '@rozek/sds-core'
-import { SDS_Item }              from '@rozek/sds-core'
-import { SDS_Link }              from '@rozek/sds-core'
 import {
+  SDS_DataStore as SDS_StoreBase,
+  _base64ToUint8Array,
+  SDS_DataStoreOptions,
+  SDS_Entry, SDS_Item, SDS_Link,
+  maxOrderKeyLength,
+  expectValidLabel, expectValidMIMEType, expectValidInfoKey, checkInfoValueSize,
   RootId, TrashId, LostAndFoundId,
   DefaultMIMEType, DefaultLiteralSizeLimit, DefaultBinarySizeLimit,
   DefaultWrapperCacheSize,
-} from './constants.js'
+} from '@rozek/sds-core'
+import type { ChangeOrigin, ChangeHandler, SDS_EntryJSON, SDS_ItemJSON, SDS_LinkJSON } from '@rozek/sds-core'
 import type { SDS_ChangeSet }  from '../changeset/SDS_ChangeSet.js'
 import type { SDS_SyncCursor } from '../interfaces/SDS_PersistenceProvider.js'
 
@@ -41,44 +45,86 @@ import type { SDS_SyncCursor } from '../interfaces/SDS_PersistenceProvider.js'
 //                                   Types                                    //
 //----------------------------------------------------------------------------//
 
-  export type ChangeOrigin  = 'internal' | 'external'
-  export type ChangeHandler = (Origin:ChangeOrigin, ChangeSet:SDS_ChangeSet) => void
-
-  export interface SDS_DataStoreOptions {
-    LiteralSizeLimit?:number
-
-    // Time in milliseconds after which entries that have been moved to TrashItem
-    // are automatically purged. Protected entries (those with incoming links from
-    // the root-reachable tree) are silently skipped.
-    // Undefined (the default) disables auto-purge.
-    TrashTTLms?:number
-
-    // How often the auto-purge check runs, in milliseconds.
-    // Defaults to min(TrashTTLms / 4, 3 600 000).
-    // Ignored when TrashTTLms is not set.
-    TrashCheckIntervalMs?:number
-  }
+  export type { ChangeOrigin, ChangeHandler, SDS_DataStoreOptions }
 
 //----------------------------------------------------------------------------//
 //                          Zod Validation Schemas                            //
 //----------------------------------------------------------------------------//
 
-  const StringSchema   = z.string()
-  const MIMETypeSchema = z.string().min(1)
-  const OptIndexSchema = z.number().int().nonnegative().optional()
+  const optIndexSchema = z.number().int().nonnegative().optional()
+
+  function parseInsertionIndex (Value:unknown):void {
+    const Result = optIndexSchema.safeParse(Value)
+    if (! Result.success) {
+      throw new SDS_Error('invalid-argument', Result.error.issues[0]?.message ?? 'InsertionIndex must be a non-negative integer')
+    }
+  }
+
+//----------------------------------------------------------------------------//
+//                        Module-level JSON helpers                           //
+//----------------------------------------------------------------------------//
+
+/**** _yjsCreateEntry — recursively populate a Y.Map from an SDS_EntryJSON tree ****/
+
+  function _yjsCreateEntry (
+    JSON_:SDS_EntryJSON, outerItemId:string, orderKey:string,
+    EntriesMap:Y.Map<Y.Map<any>>
+  ):void {
+    const Id       = JSON_.Id
+    const EntryMap = new Y.Map<any>()
+    EntryMap.set('Kind',        JSON_.Kind)
+    EntryMap.set('outerItemId', outerItemId)
+    EntryMap.set('OrderKey',    orderKey)
+    EntryMap.set('Label',       new Y.Text(JSON_.Label ?? ''))
+    const InfoMap = new Y.Map<any>()
+    for (const [Key, Val] of Object.entries(JSON_.Info ?? {})) { InfoMap.set(Key, Val) }
+    EntryMap.set('Info', InfoMap)
+
+    if (JSON_.Kind === 'item') {
+      const ItemJSON   = JSON_ as SDS_ItemJSON
+      const storedType = ItemJSON.Type === DefaultMIMEType ? '' : (ItemJSON.Type ?? '')
+      EntryMap.set('MIMEType', storedType)
+
+      switch (true) {
+        case (ItemJSON.ValueKind === 'literal' && ItemJSON.Value !== undefined): {
+          EntryMap.set('ValueKind',    'literal')
+          EntryMap.set('literalValue', new Y.Text(ItemJSON.Value!))
+          break
+        }
+        case (ItemJSON.ValueKind === 'binary' && ItemJSON.Value !== undefined): {
+          EntryMap.set('ValueKind',   'binary')
+          EntryMap.set('binaryValue', _base64ToUint8Array(ItemJSON.Value!))
+          break
+        }
+        default:
+          EntryMap.set('ValueKind', ItemJSON.ValueKind ?? 'none')
+      }
+
+      EntriesMap.set(Id, EntryMap)
+
+      const FreshKeys = generateNKeysBetween(null, null, (ItemJSON.innerEntries ?? []).length)
+      ;(ItemJSON.innerEntries ?? []).forEach((innerJSON, i) => {
+        _yjsCreateEntry(innerJSON, Id, FreshKeys[i], EntriesMap)
+      })
+    } else {
+      const LinkJSON = JSON_ as SDS_LinkJSON
+      EntryMap.set('TargetId', LinkJSON.TargetId ?? '')
+      EntriesMap.set(Id, EntryMap)
+    }
+  }
 
 //----------------------------------------------------------------------------//
 //                                SDS_DataStore                               //
 //----------------------------------------------------------------------------//
 
-export class SDS_DataStore {
+export class SDS_DataStore extends SDS_StoreBase {
 
 /**** private state ****/
 
   #doc:              Y.Doc
   #EntriesMap:       Y.Map<Y.Map<any>>
   #LiteralSizeLimit:number
-  #TrashTTLms:       number | null
+  #TrashTTLms:       number
   #TrashCheckTimer:  ReturnType<typeof setInterval> | null = null
   #Handlers:         Set<ChangeHandler> = new Set()
 
@@ -99,7 +145,7 @@ export class SDS_DataStore {
   readonly #MaxCacheSize = DefaultWrapperCacheSize
 
   // transaction nesting
-  #TransactDepth = 0
+  #TransactionDepth = 0
 
   // ChangeSet accumulator inside a transaction
   #PendingChangeSet:SDS_ChangeSet = {}
@@ -114,23 +160,22 @@ export class SDS_DataStore {
 /**** constructor — initialise store from document and options ****/
 
   private constructor (Doc:Y.Doc, Options?:SDS_DataStoreOptions) {
+    super()
     this.#doc              = Doc
     this.#EntriesMap       = Doc.getMap('Entries') as Y.Map<Y.Map<any>>
     this.#LiteralSizeLimit = Options?.LiteralSizeLimit ?? DefaultLiteralSizeLimit
-    this.#TrashTTLms       = Options?.TrashTTLms ?? null
+    this.#TrashTTLms       = Options?.TrashTTLms ?? 2_592_000_000
     this.#rebuildIndices()
 
-    if (this.#TrashTTLms != null) {
-      const CheckIntervalMs = Options?.TrashCheckIntervalMs
-        ?? Math.min(Math.floor(this.#TrashTTLms / 4), 3_600_000)
-      this.#TrashCheckTimer = setInterval(
-        () => { this.purgeExpiredTrashEntries() },
-        CheckIntervalMs
-      )
-      // Let Node.js exit even while the timer is pending.
-      if (typeof (this.#TrashCheckTimer as any)?.unref === 'function') {
-        (this.#TrashCheckTimer as any).unref()
-      }
+    const CheckIntervalMs = Options?.TrashCheckIntervalMs
+      ?? Math.min(Math.floor(this.#TrashTTLms/4), 3_600_000)
+    this.#TrashCheckTimer = setInterval(
+      () => { this.purgeExpiredTrashEntries() },
+      CheckIntervalMs
+    )
+    // let Node.js exit even while the timer is pending
+    if (typeof (this.#TrashCheckTimer as any)?.unref === 'function') {
+      (this.#TrashCheckTimer as any).unref()
     }
   }
 
@@ -195,17 +240,19 @@ export class SDS_DataStore {
     return new SDS_DataStore(Doc, Options)
   }
 
-/**** fromJSON — restore store from base64-encoded data ****/
+/**** fromJSON — restore store from a plain JSON object or its JSON.stringify representation ****/
 
-  static fromJSON (Data:unknown, Options?:SDS_DataStoreOptions):SDS_DataStore {
-    let Binary:Uint8Array
-    const NodeBuffer = (globalThis as any).Buffer
-    if (NodeBuffer != null) {
-      Binary = new Uint8Array(NodeBuffer.from(String(Data), 'base64'))
-    } else {
-      Binary = Uint8Array.from(atob(String(Data)), (c) => c.charCodeAt(0))
-    }
-    return SDS_DataStore.fromBinary(Binary, Options)
+  static fromJSON (Serialisation:unknown, Options?:SDS_DataStoreOptions):SDS_DataStore {
+    const JSON_ = (typeof Serialisation === 'string'
+      ? JSON.parse(Serialisation)
+      : Serialisation) as SDS_ItemJSON
+
+    const Doc        = new Y.Doc()
+    const EntriesMap = Doc.getMap('Entries') as Y.Map<Y.Map<any>>
+
+    Doc.transact(() => { _yjsCreateEntry(JSON_, '', '', EntriesMap) })
+
+    return new SDS_DataStore(Doc, Options)
   }
 
 //----------------------------------------------------------------------------//
@@ -214,9 +261,9 @@ export class SDS_DataStore {
 
 /**** RootItem / TrashItem / LostAndFoundItem — access system items ****/
 
-  get RootItem ():SDS_Item         { return this.#wrapItem(RootId) }
-  get TrashItem ():SDS_Item        { return this.#wrapItem(TrashId) }
-  get LostAndFoundItem ():SDS_Item { return this.#wrapItem(LostAndFoundId) }
+  get RootItem ():SDS_Item         { return this.#wrappedItem(RootId) }
+  get TrashItem ():SDS_Item        { return this.#wrappedItem(TrashId) }
+  get LostAndFoundItem ():SDS_Item { return this.#wrappedItem(LostAndFoundId) }
 
 //----------------------------------------------------------------------------//
 //                                   Lookup                                   //
@@ -226,31 +273,30 @@ export class SDS_DataStore {
 
   EntryWithId (EntryId:string):SDS_Entry | undefined {
     if (! this.#EntriesMap.has(EntryId)) { return undefined }
-    return this.#wrap(EntryId)
+    return this.#wrapped(EntryId)
   }
 
 //----------------------------------------------------------------------------//
 //                                  Factory                                   //
 //----------------------------------------------------------------------------//
 
-/**** newItemAt — create data as inner data of outer data ****/
+/**** newItemAt — create a new item of given type as inner entry of outerItem ****/
 
-  newItemAt (OuterItem:SDS_Item, Type?:string, InsertionIndex?:number):SDS_Item {
-    const effectiveType = Type ?? DefaultMIMEType
-    if (! MIMETypeSchema.safeParse(effectiveType).success) {
-      throw new SDS_Error('invalid-argument', 'MIMEType must be a non-empty string')
-    }
-    OptIndexSchema.parse(InsertionIndex)
-    this.#requireItemExists(OuterItem.Id)
+  newItemAt (MIMEType:string|undefined, outerItem:SDS_Item, InsertionIndex?:number):SDS_Item {
+    if (outerItem == null) throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    const effectiveType = MIMEType ?? DefaultMIMEType
+    expectValidMIMEType(effectiveType)
+    parseInsertionIndex(InsertionIndex)
+    this.#requireItemExists(outerItem.Id)
 
     const Id        = crypto.randomUUID()
-    const OrderKey  = this.#orderKeyAt(OuterItem.Id, InsertionIndex)
+    const OrderKey  = this.#OrderKeyAt(outerItem.Id, InsertionIndex)
     const storedType = effectiveType === DefaultMIMEType ? '' : effectiveType
 
     this.transact(() => {
       const EntryMap = new Y.Map<any>()
       EntryMap.set('Kind',        'item')
-      EntryMap.set('outerItemId', OuterItem.Id)
+      EntryMap.set('outerItemId', outerItem.Id)
       EntryMap.set('OrderKey',    OrderKey)
       EntryMap.set('Label',       new Y.Text())
       EntryMap.set('Info',        new Y.Map())
@@ -258,195 +304,138 @@ export class SDS_DataStore {
       EntryMap.set('ValueKind',   'none')
       this.#EntriesMap.set(Id, EntryMap)
 
-      this.#addToReverseIndex(OuterItem.Id, Id)
-      this.#recordChange(OuterItem.Id, 'innerEntryList')
+      this.#addToReverseIndex(outerItem.Id, Id)
+      this.#recordChange(outerItem.Id, 'innerEntryList')
       this.#recordChange(Id, 'outerItem')
     })
 
-    return this.#wrapItem(Id)
+    return this.#wrappedItem(Id)
   }
 
 /**** newLinkAt — create link as inner link of outer data ****/
 
-  newLinkAt (Target:SDS_Item, OuterItem:SDS_Item, InsertionIndex?:number):SDS_Link {
-    OptIndexSchema.parse(InsertionIndex)
+  newLinkAt (Target:SDS_Item, outerItem:SDS_Item, InsertionIndex?:number):SDS_Link {
+    if (Target == null)     throw new SDS_Error('invalid-argument','Target must not be missing')
+    if (outerItem == null)  throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    parseInsertionIndex(InsertionIndex)
     this.#requireItemExists(Target.Id)
-    this.#requireItemExists(OuterItem.Id)
+    this.#requireItemExists(outerItem.Id)
 
     const Id       = crypto.randomUUID()
-    const OrderKey = this.#orderKeyAt(OuterItem.Id, InsertionIndex)
+    const OrderKey = this.#OrderKeyAt(outerItem.Id, InsertionIndex)
 
     this.transact(() => {
       const EntryMap = new Y.Map<any>()
       EntryMap.set('Kind',        'link')
-      EntryMap.set('outerItemId', OuterItem.Id)
+      EntryMap.set('outerItemId', outerItem.Id)
       EntryMap.set('OrderKey',    OrderKey)
       EntryMap.set('Label',       new Y.Text())
       EntryMap.set('Info',        new Y.Map())
       EntryMap.set('TargetId',    Target.Id)
       this.#EntriesMap.set(Id, EntryMap)
 
-      this.#addToReverseIndex(OuterItem.Id, Id)
+      this.#addToReverseIndex(outerItem.Id, Id)
       this.#addToLinkTargetIndex(Target.Id, Id)
-      this.#recordChange(OuterItem.Id, 'innerEntryList')
+      this.#recordChange(outerItem.Id, 'innerEntryList')
       this.#recordChange(Id, 'outerItem')
     })
 
-    return this.#wrapLink(Id)
+    return this.#wrappedLink(Id)
   }
 
 //----------------------------------------------------------------------------//
 //                                   Import                                   //
 //----------------------------------------------------------------------------//
 
-/**** deserializeItemInto — import data subtree with remapped IDs ****/
+/**** deserializeItemInto — import item subtree; always remaps all IDs ****/
 
   deserializeItemInto (
-    Serialization:unknown, OuterItem:SDS_Item, InsertionIndex?:number
+    Serialisation:unknown, outerItem:SDS_Item, InsertionIndex?:number
   ):SDS_Item {
-    OptIndexSchema.parse(InsertionIndex)
-    this.#requireItemExists(OuterItem.Id)
-    if (Serialization == null) {
-      throw new SDS_Error('invalid-argument', 'Serialisation must not be null')
+    if (outerItem == null) throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    parseInsertionIndex(InsertionIndex)
+    this.#requireItemExists(outerItem.Id)
+
+    const JSON_ = Serialisation as SDS_ItemJSON
+    if (JSON_ == null || JSON_.Kind !== 'item') {
+      throw new SDS_Error('invalid-argument', 'Serialisation must be an SDS_ItemJSON object')
     }
 
-    const RestoredView = Serialization as { Entries: Record<string,any> }
-    const Ids          = Object.keys(RestoredView.Entries ?? {})
-    if (Ids.length === 0) {
-      throw new SDS_Error('invalid-argument', 'empty serialisation')
-    }
+    const IdMap    = new Map<string,string>()
+    this.#collectEntryIds(JSON_, IdMap)
 
-    const oldRootId = Ids[0]
-    const newRootId = crypto.randomUUID()
-    const IdMap     = new Map<string,string>([[oldRootId, newRootId]])
-
-    for (const oldId of Ids) {
-      if (! IdMap.has(oldId)) { IdMap.set(oldId, crypto.randomUUID()) }
-    }
-
-    const OrderKey = this.#orderKeyAt(OuterItem.Id, InsertionIndex)
+    const OrderKey  = this.#OrderKeyAt(outerItem.Id, InsertionIndex)
+    const rootNewId = IdMap.get(JSON_.Id)!
 
     this.transact(() => {
-      for (const oldId of Ids) {
-        const Data    = RestoredView.Entries[oldId]
-        const newId   = IdMap.get(oldId)!
-        const isRoot  = (oldId === oldRootId)
-
-        const newOuterItemId = isRoot
-          ? OuterItem.Id
-          : (Data.outerPlacement?.outerItemId != null
-            ? (IdMap.get(Data.outerPlacement.outerItemId) ?? OuterItem.Id)
-            : undefined)
-        const newOrderKey = isRoot
-          ? OrderKey
-          : (Data.outerPlacement?.OrderKey ?? '')
-
-        const EntryMap = new Y.Map<any>()
-        EntryMap.set('Kind',  Data.Kind)
-        EntryMap.set('Label', new Y.Text(Data.Label ?? ''))
-        EntryMap.set('Info',  new Y.Map())
-
-        if (newOuterItemId != null) {
-          EntryMap.set('outerItemId', newOuterItemId)
-          EntryMap.set('OrderKey',    newOrderKey)
-        } else {
-          EntryMap.set('outerItemId', '')
-          EntryMap.set('OrderKey',    '')
-        }
-
-        if (Data.Kind === 'item') {
-          EntryMap.set('MIMEType',  Data.MIMEType ?? '')
-          EntryMap.set('ValueKind', 'none')
-        } else {
-          EntryMap.set('TargetId',
-            Data.TargetId != null ? (IdMap.get(Data.TargetId) ?? Data.TargetId) : '')
-        }
-
-        this.#EntriesMap.set(newId, EntryMap)
-        if (newOuterItemId) { this.#addToReverseIndex(newOuterItemId, newId) }
-        if (Data.Kind === 'link' && Data.TargetId != null) {
-          this.#addToLinkTargetIndex(IdMap.get(Data.TargetId) ?? Data.TargetId, newId)
-        }
-      }
-      this.#recordChange(OuterItem.Id, 'innerEntryList')
+      this.#importEntryFromJSON(JSON_, outerItem.Id, OrderKey, IdMap)
+      this.#recordChange(outerItem.Id, 'innerEntryList')
     })
 
-    return this.#wrapItem(newRootId)
+    return this.#wrappedItem(rootNewId)
   }
 
-/**** deserializeLinkInto — import link with remapped target Id ****/
+/**** deserializeLinkInto — import link; always assigns a new Id ****/
 
   deserializeLinkInto (
-    Serialization:unknown, OuterItem:SDS_Item, InsertionIndex?:number
+    Serialisation:unknown, outerItem:SDS_Item, InsertionIndex?:number
   ):SDS_Link {
-    OptIndexSchema.parse(InsertionIndex)
-    this.#requireItemExists(OuterItem.Id)
-    if (Serialization == null) {
-      throw new SDS_Error('invalid-argument', 'Serialisation must not be null')
-    }
+    if (outerItem == null) throw new SDS_Error('invalid-argument','outerItem must not be missing')
+    parseInsertionIndex(InsertionIndex)
+    this.#requireItemExists(outerItem.Id)
 
-    const RestoredView = Serialization as { Entries: Record<string,any> }
-    const Ids          = Object.keys(RestoredView.Entries ?? {})
-    if (Ids.length === 0) {
-      throw new SDS_Error('invalid-argument', 'empty serialisation')
-    }
-
-    const Data = RestoredView.Entries[Ids[0]]
-    if (Data.Kind !== 'link') {
-      throw new SDS_Error('invalid-argument', 'serialisation is not a link')
+    const JSON_ = Serialisation as SDS_LinkJSON
+    if (JSON_ == null || JSON_.Kind !== 'link') {
+      throw new SDS_Error('invalid-argument', 'Serialisation must be an SDS_LinkJSON object')
     }
 
     const newId    = crypto.randomUUID()
-    const OrderKey = this.#orderKeyAt(OuterItem.Id, InsertionIndex)
+    const OrderKey = this.#OrderKeyAt(outerItem.Id, InsertionIndex)
 
     this.transact(() => {
       const EntryMap = new Y.Map<any>()
       EntryMap.set('Kind',        'link')
-      EntryMap.set('outerItemId', OuterItem.Id)
+      EntryMap.set('outerItemId', outerItem.Id)
       EntryMap.set('OrderKey',    OrderKey)
-      EntryMap.set('Label',       new Y.Text(Data.Label ?? ''))
-      EntryMap.set('Info',        new Y.Map())
-      EntryMap.set('TargetId',    Data.TargetId ?? '')
+      EntryMap.set('Label',       new Y.Text(JSON_.Label ?? ''))
+      const InfoMap = new Y.Map<any>()
+      for (const [Key, Val] of Object.entries(JSON_.Info ?? {})) { InfoMap.set(Key, Val) }
+      EntryMap.set('Info',     InfoMap)
+      EntryMap.set('TargetId', JSON_.TargetId ?? '')
       this.#EntriesMap.set(newId, EntryMap)
 
-      this.#addToReverseIndex(OuterItem.Id, newId)
-      if (Data.TargetId) { this.#addToLinkTargetIndex(Data.TargetId, newId) }
-      this.#recordChange(OuterItem.Id, 'innerEntryList')
+      this.#addToReverseIndex(outerItem.Id, newId)
+      if (JSON_.TargetId) { this.#addToLinkTargetIndex(JSON_.TargetId, newId) }
+      this.#recordChange(outerItem.Id, 'innerEntryList')
     })
 
-    return this.#wrapLink(newId)
+    return this.#wrappedLink(newId)
   }
 
 //----------------------------------------------------------------------------//
 //                               Move / Delete                                //
 //----------------------------------------------------------------------------//
 
-/**** EntryMayBeMovedTo — check if entry can move to new outer data ****/
-
-  EntryMayBeMovedTo (Entry:SDS_Entry, OuterItem:SDS_Item, InsertionIndex?:number):boolean {
-    return Entry.mayBeMovedTo(OuterItem, InsertionIndex)
-  }
-
 /**** moveEntryTo — move entry to new outer data and position ****/
 
-  moveEntryTo (Entry:SDS_Entry, OuterItem:SDS_Item, InsertionIndex?:number):void {
-    OptIndexSchema.parse(InsertionIndex)
-    if (! this._mayMoveEntryTo(Entry.Id, OuterItem.Id, InsertionIndex)) {
+  moveEntryTo (Entry:SDS_Entry, outerItem:SDS_Item, InsertionIndex?:number):void {
+    parseInsertionIndex(InsertionIndex)
+    if (! this._mayMoveEntryTo(Entry.Id, outerItem.Id, InsertionIndex)) {
       throw new SDS_Error('move-would-cycle',
         'cannot move an entry into one of its own descendants')
     }
 
     const oldOuterItemId = this._outerItemIdOf(Entry.Id)
-    const OrderKey       = this.#orderKeyAt(OuterItem.Id, InsertionIndex)
+    const OrderKey       = this.#OrderKeyAt(outerItem.Id, InsertionIndex)
 
     this.transact(() => {
       const EntryMap = this.#EntriesMap.get(Entry.Id)!
-      EntryMap.set('outerItemId', OuterItem.Id)
+      EntryMap.set('outerItemId', outerItem.Id)
       EntryMap.set('OrderKey',    OrderKey)
 
       // When moving an entry out of TrashItem, remove the _trashedAt timestamp
       // so that a subsequent deleteEntry() will record a fresh timestamp.
-      if (oldOuterItemId === TrashId && OuterItem.Id !== TrashId) {
+      if (oldOuterItemId === TrashId && outerItem.Id !== TrashId) {
         const InfoMap = EntryMap.get('Info') as Y.Map<any> | undefined
         if (InfoMap instanceof Y.Map && InfoMap.has('_trashedAt')) {
           InfoMap.delete('_trashedAt')
@@ -458,16 +447,24 @@ export class SDS_DataStore {
         this.#removeFromReverseIndex(oldOuterItemId, Entry.Id)
         this.#recordChange(oldOuterItemId, 'innerEntryList')
       }
-      this.#addToReverseIndex(OuterItem.Id, Entry.Id)
-      this.#recordChange(OuterItem.Id, 'innerEntryList')
+      this.#addToReverseIndex(outerItem.Id, Entry.Id)
+      this.#recordChange(outerItem.Id, 'innerEntryList')
       this.#recordChange(Entry.Id, 'outerItem')
     })
   }
 
-/**** EntryMayBeDeleted — check if entry can be deleted ****/
+/**** _rebalanceInnerEntriesOf — backend-specific raw rebalance; caller must hold a transaction ****/
 
-  EntryMayBeDeleted (Entry:SDS_Entry):boolean {
-    return Entry.mayBeDeleted
+  _rebalanceInnerEntriesOf (outerItemId:string):void {
+    const innerEntries = this.#sortedInnerEntriesOf(outerItemId)
+    if (innerEntries.length === 0) { return }
+    const freshKeys = generateNKeysBetween(null, null, innerEntries.length)
+    innerEntries.forEach((innerEntry, i) => {
+      const EntryMap = this.#EntriesMap.get(innerEntry.Id)
+      if (EntryMap == null) { return }
+      EntryMap.set('OrderKey', freshKeys[i])
+      this.#recordChange(innerEntry.Id, 'outerItem')
+    })
   }
 
 /**** deleteEntry — move entry to trash with timestamp ****/
@@ -541,7 +538,7 @@ export class SDS_DataStore {
       if (typeof trashedAt !== 'number') { continue }
       if (Now - trashedAt < effectiveTTL) { continue }
       try {
-        this.purgeEntry(this.#wrap(EntryId))
+        this.purgeEntry(this.#wrapped(EntryId))
         Count++
       } catch (_Signal) { /* protected or already removed — skip */ }
     }
@@ -564,9 +561,9 @@ export class SDS_DataStore {
 /**** transact — execute callback in batched transaction ****/
 
   transact (Callback:() => void):void {
-    this.#TransactDepth++
+    this.#TransactionDepth++
     try {
-      if (this.#TransactDepth === 1 && ! this.#ApplyingExternal) {
+      if (this.#TransactionDepth === 1 && ! this.#ApplyingExternal) {
         // Outermost local transaction: wrap in a Y.js transaction so all
         // CRDT mutations are batched into a single update event.
         this.#doc.transact(() => { Callback() })
@@ -574,8 +571,8 @@ export class SDS_DataStore {
         Callback()
       }
     } finally {
-      this.#TransactDepth--
-      if (this.#TransactDepth === 0) {
+      this.#TransactionDepth--
+      if (this.#TransactionDepth === 0) {
         const ChangeSet          = { ...this.#PendingChangeSet }
         this.#PendingChangeSet   = {}
         const Origin:ChangeOrigin = this.#ApplyingExternal ? 'external' : 'internal'
@@ -683,17 +680,20 @@ export class SDS_DataStore {
     return gzipSync(Y.encodeStateAsUpdate(this.#doc))
   }
 
-/**** asJSON — export as base64-encoded compressed update ****/
+/**** newEntryFromBinaryAt — import a gzip-compressed entry (item or link) ****/
 
-  asJSON ():string {
-    const Bytes  = this.asBinary()
-    const NodeBuffer = (globalThis as any).Buffer
-    if (NodeBuffer != null) {
-      return NodeBuffer.from(Bytes).toString('base64')
-    }
-    let Binary = ''
-    for (let i = 0; i < Bytes.byteLength; i++) { Binary += String.fromCharCode(Bytes[i]) }
-    return btoa(Binary)
+  newEntryFromBinaryAt (
+    Serialisation:Uint8Array, outerItem:SDS_Item, InsertionIndex?:number
+  ):SDS_Entry {
+    const JSONString = new TextDecoder().decode(gunzipSync(Serialisation))
+    return this.newEntryFromJSONat(JSON.parse(JSONString), outerItem, InsertionIndex)
+  }
+
+/**** _EntryAsBinary — gzip-compress the JSON representation of an entry ****/
+
+  _EntryAsBinary (Id:string):Uint8Array {
+    const JSONString = JSON.stringify(this._EntryAsJSON(Id))
+    return gzipSync(new TextEncoder().encode(JSONString))
   }
 
 //----------------------------------------------------------------------------//
@@ -709,19 +709,19 @@ export class SDS_DataStore {
     }
   }
 
-/**** #wrap / #wrapItem / #wrapLink — return cached wrapper objects ****/
+/**** #wrapped — return cached wrapper objects ****/
 
-  #wrap (Id:string):SDS_Entry {
+  #wrapped (Id:string):SDS_Entry {
     const EntryMap = this.#EntriesMap.get(Id)
     if (EntryMap == null) {
       throw new SDS_Error('invalid-argument', `entry '${Id}' not found`)
     }
-    return EntryMap.get('Kind') === 'item' ? this.#wrapItem(Id) : this.#wrapLink(Id)
+    return EntryMap.get('Kind') === 'item' ? this.#wrappedItem(Id) : this.#wrappedLink(Id)
   }
 
-/**** #wrapItem — return or create cached wrapper for data ****/
+/**** #wrappedItem — return or create cached wrapper for data ****/
 
-  #wrapItem (Id:string):SDS_Item {
+  #wrappedItem (Id:string):SDS_Item {
     const Cached = this.#WrapperCache.get(Id)
     if (Cached instanceof SDS_Item) { return Cached }
     const Wrapper = new SDS_Item(this, Id)
@@ -729,9 +729,9 @@ export class SDS_DataStore {
     return Wrapper
   }
 
-/**** #wrapLink — return or create cached wrapper for link ****/
+/**** #wrappedLink — return or create cached wrapper for link ****/
 
-  #wrapLink (Id:string):SDS_Link {
+  #wrappedLink (Id:string):SDS_Link {
     const Cached = this.#WrapperCache.get(Id)
     if (Cached instanceof SDS_Link) { return Cached }
     const Wrapper = new SDS_Link(this, Id)
@@ -790,15 +790,19 @@ export class SDS_DataStore {
         this.#recordChange(EntryId, 'outerItem')
       }
 
-      if (EntryMap.get('Kind') === 'link') {
-        const newTargetId = EntryMap.get('TargetId') as string | undefined
-        const oldTargetId = this.#LinkForwardIndex.get(EntryId)
-        if (newTargetId !== oldTargetId) {
-          if (oldTargetId != null) { this.#removeFromLinkTargetIndex(oldTargetId, EntryId) }
-          if (newTargetId != null) { this.#addToLinkTargetIndex(newTargetId, EntryId) }
+      switch (true) {
+        case (EntryMap.get('Kind') === 'link'): {
+          const newTargetId = EntryMap.get('TargetId') as string | undefined
+          const oldTargetId = this.#LinkForwardIndex.get(EntryId)
+          if (newTargetId !== oldTargetId) {
+            if (oldTargetId != null) { this.#removeFromLinkTargetIndex(oldTargetId, EntryId) }
+            if (newTargetId != null) { this.#addToLinkTargetIndex(newTargetId, EntryId) }
+          }
+          break
         }
-      } else if (this.#LinkForwardIndex.has(EntryId)) {
-        this.#removeFromLinkTargetIndex(this.#LinkForwardIndex.get(EntryId)!, EntryId)
+        case this.#LinkForwardIndex.has(EntryId):
+          this.#removeFromLinkTargetIndex(this.#LinkForwardIndex.get(EntryId)!, EntryId)
+          break
       }
 
       // Conservative: assume label may have changed
@@ -858,18 +862,25 @@ export class SDS_DataStore {
     this.#LinkForwardIndex.delete(LinkId)
   }
 
-/**** #orderKeyAt — generate fractional key at insertion position ****/
+/**** #OrderKeyAt — generate fractional key at insertion position ****/
 
-  #orderKeyAt (outerItemId:string, InsertionIndex?:number):string {
-    const innerEntries = this.#sortedInnerEntriesOf(outerItemId)
-    if (innerEntries.length === 0 || InsertionIndex == null) {
-      const LastKey = innerEntries.length > 0 ? innerEntries[innerEntries.length-1].OrderKey : null
-      return generateKeyBetween(LastKey, null)
+  #OrderKeyAt (outerItemId:string, InsertionIndex?:number):string {
+    const keyFrom = (Entries:Array<{OrderKey:string}>):string => {
+      if (Entries.length === 0 || InsertionIndex == null) {
+        const Last = Entries.length > 0 ? Entries[Entries.length-1].OrderKey : null
+        return generateKeyBetween(Last, null)
+      }
+      const i = Math.max(0, Math.min(InsertionIndex, Entries.length))
+      return generateKeyBetween(
+        i > 0 ? Entries[i-1].OrderKey : null,
+        i < Entries.length ? Entries[i].OrderKey : null
+      )
     }
-    const ClampedIndex = Math.max(0, Math.min(InsertionIndex, innerEntries.length))
-    const Before = ClampedIndex > 0 ? innerEntries[ClampedIndex-1].OrderKey : null
-    const After  = ClampedIndex < innerEntries.length ? innerEntries[ClampedIndex].OrderKey : null
-    return generateKeyBetween(Before, After)
+    let Entries = this.#sortedInnerEntriesOf(outerItemId)
+    const Key   = keyFrom(Entries)
+    if (Key.length <= maxOrderKeyLength) { return Key }
+    this._rebalanceInnerEntriesOf(outerItemId)
+    return keyFrom(this.#sortedInnerEntriesOf(outerItemId))
   }
 
 /**** #lastOrderKeyOf — get last inner entry's order key ****/
@@ -908,7 +919,7 @@ export class SDS_DataStore {
       Changed = false
       for (const DirectChild of (this.#ReverseIndex.get(TrashId) ?? new Set())) {
         if (Protected.has(DirectChild)) { continue }
-        if (this.#subtreeHasIncomingLinks(DirectChild, RootReachable, Protected)) {
+        if (this.#SubtreeHasIncomingLinks(DirectChild, RootReachable, Protected)) {
           Protected.add(DirectChild)
           Changed = true
         }
@@ -917,9 +928,9 @@ export class SDS_DataStore {
     return Protected.has(TrashBranchId)
   }
 
-/**** #subtreeHasIncomingLinks — check if subtree has root-reachable links ****/
+/**** #SubtreeHasIncomingLinks — check if subtree has root-reachable links ****/
 
-  #subtreeHasIncomingLinks (
+  #SubtreeHasIncomingLinks (
     RootOfSubtree:string, RootReachable:Set<string>, Protected:Set<string>
   ):boolean {
     const Queue   = [RootOfSubtree]
@@ -984,12 +995,12 @@ export class SDS_DataStore {
 
     const innerEntries = Array.from(this.#ReverseIndex.get(EntryId) ?? new Set<string>())
     for (const innerEntryId of innerEntries) {
-      if (this.#subtreeHasIncomingLinks(innerEntryId, RootReachable, Protected)) {
+      if (this.#SubtreeHasIncomingLinks(innerEntryId, RootReachable, Protected)) {
         // Inner rescue: move to TrashItem top level
-        const InnerMap = this.#EntriesMap.get(innerEntryId)!
+        const innerMap = this.#EntriesMap.get(innerEntryId)!
         const OrderKey = generateKeyBetween(this.#lastOrderKeyOf(TrashId), null)
-        InnerMap.set('outerItemId', TrashId)
-        InnerMap.set('OrderKey',    OrderKey)
+        innerMap.set('outerItemId', TrashId)
+        innerMap.set('OrderKey',    OrderKey)
         this.#removeFromReverseIndex(EntryId, innerEntryId)
         this.#addToReverseIndex(TrashId, innerEntryId)
         this.#recordChange(TrashId, 'innerEntryList')
@@ -999,7 +1010,10 @@ export class SDS_DataStore {
       }
     }
 
-    // Delete the entry itself
+    // signal deletion before removing the entry (so listeners can still read ValueRef etc.)
+    this.#recordChange(EntryId, 'Existence')
+
+    // delete the entry itself
     this.#EntriesMap.delete(EntryId)
     if (oldOuterItemId) {
       this.#removeFromReverseIndex(oldOuterItemId, EntryId)
@@ -1054,7 +1068,7 @@ export class SDS_DataStore {
 /**** _setLabelOf — set entry label text ****/
 
   _setLabelOf (Id:string, Value:string):void {
-    StringSchema.parse(Value)
+    expectValidLabel(Value)
     this.transact(() => {
       const EntryMap = this.#EntriesMap.get(Id)
       if (EntryMap == null) { return }
@@ -1081,7 +1095,7 @@ export class SDS_DataStore {
 /**** _setTypeOf — set data MIME type ****/
 
   _setTypeOf (Id:string, Value:string):void {
-    MIMETypeSchema.parse(Value)
+    expectValidMIMEType(Value)
     const storedValue = Value === DefaultMIMEType ? '' : Value
     this.transact(() => {
       this.#EntriesMap.get(Id)?.set('MIMEType', storedValue)
@@ -1096,20 +1110,6 @@ export class SDS_DataStore {
   {
     const EntryMap = this.#EntriesMap.get(Id)
     return ((EntryMap?.get('ValueKind') as string | undefined) ?? 'none') as any
-  }
-
-/**** _isLiteralOf — check if data has literal value ****/
-
-  _isLiteralOf (Id:string):boolean {
-    const Kind = this._ValueKindOf(Id)
-    return Kind === 'literal' || Kind === 'literal-reference'
-  }
-
-/**** _isBinaryOf — check if data has binary value ****/
-
-  _isBinaryOf (Id:string):boolean {
-    const Kind = this._ValueKindOf(Id)
-    return Kind === 'binary' || Kind === 'binary-reference'
   }
 
 /**** _readValueOf — get data value (literal or binary) ****/
@@ -1127,9 +1127,13 @@ export class SDS_DataStore {
         const EntryMap = this.#EntriesMap.get(Id)
         return EntryMap?.get('binaryValue') as Uint8Array | undefined
       }
-      default:
-        throw new SDS_Error('not-implemented',
-          'large value fetching requires a ValueStore (not yet wired)')
+      default: {
+        const ref = this._getValueRefOf(Id)
+        if (ref == undefined) { return undefined }
+        const Blob = await this._getValueBlobAsync(ref.Hash)
+        if (Blob == undefined) { return undefined }
+        return Kind === 'literal-reference' ? new TextDecoder().decode(Blob) : Blob
+      }
     }
   }
 
@@ -1160,7 +1164,8 @@ export class SDS_DataStore {
         case (typeof Value === 'string'): {
           const Encoder = new TextEncoder()
           const Bytes   = Encoder.encode(Value as string)
-          const Hash    = `sha256-size-${Bytes.byteLength}`
+          const Hash    = SDS_DataStore._blobHash(Bytes)
+          this._storeValueBlob(Hash, Bytes)
           EntryMap.set('ValueKind', 'literal-reference')
           EntryMap.set('ValueRef',  { Hash, Size:Bytes.byteLength })
           break
@@ -1172,7 +1177,8 @@ export class SDS_DataStore {
         }
         default: {
           const Bytes = Value as Uint8Array
-          const Hash  = `sha256-size-${Bytes.byteLength}`
+          const Hash  = SDS_DataStore._blobHash(Bytes)
+          this._storeValueBlob(Hash, Bytes)
           EntryMap.set('ValueKind', 'binary-reference')
           EntryMap.set('ValueRef',  { Hash, Size:Bytes.byteLength })
           break
@@ -1187,7 +1193,7 @@ export class SDS_DataStore {
   _spliceValueOf (Id:string, fromIndex:number, toIndex:number, Replacement:string):void {
     if (this._ValueKindOf(Id) !== 'literal') {
       throw new SDS_Error('change-value-not-literal',
-        "changeValue() is only available when ValueKind === 'literal'")
+        'changeValue() is only available when ValueKind === \'literal\'')
     }
     this.transact(() => {
       const EntryMap   = this.#EntriesMap.get(Id)
@@ -1199,6 +1205,16 @@ export class SDS_DataStore {
       }
       this.#recordChange(Id, 'Value')
     })
+  }
+
+/**** _getValueRefOf — return the ValueRef for *-reference entries ****/
+
+  _getValueRefOf (Id:string):{ Hash:string; Size:number } | undefined {
+    const EntryMap = this.#EntriesMap.get(Id)
+    if (EntryMap == null) { return undefined }
+    const Kind = this._ValueKindOf(Id)
+    if (Kind !== 'literal-reference' && Kind !== 'binary-reference') { return undefined }
+    return EntryMap.get('ValueRef') as { Hash:string; Size:number } | undefined
   }
 
 /**** _InfoProxyOf — get info metadata proxy object ****/
@@ -1214,6 +1230,19 @@ export class SDS_DataStore {
       },
       set (_target, Key, Value) {
         if (typeof Key !== 'string') { return false }
+        if (Value === undefined) {
+          Store.transact(() => {
+            const EntryMap = Store.#EntriesMap.get(Id)
+            const InfoMap  = EntryMap?.get('Info') as Y.Map<any> | undefined
+            if (InfoMap instanceof Y.Map && InfoMap.has(Key)) {
+              InfoMap.delete(Key)
+              Store.#recordChange(Id, `Info.${Key}`)
+            }
+          })
+          return true
+        }
+        expectValidInfoKey(Key)
+        checkInfoValueSize(Value)
         Store.transact(() => {
           const EntryMap = Store.#EntriesMap.get(Id)
           if (EntryMap == null) { return }
@@ -1232,8 +1261,10 @@ export class SDS_DataStore {
         Store.transact(() => {
           const EntryMap = Store.#EntriesMap.get(Id)
           const InfoMap  = EntryMap?.get('Info') as Y.Map<any> | undefined
-          if (InfoMap instanceof Y.Map) { InfoMap.delete(Key) }
-          Store.#recordChange(Id, `Info.${Key}`)
+          if (InfoMap instanceof Y.Map && InfoMap.has(Key)) {
+            InfoMap.delete(Key)
+            Store.#recordChange(Id, `Info.${Key}`)
+          }
         })
         return true
       },
@@ -1255,38 +1286,12 @@ export class SDS_DataStore {
     })
   }
 
-/**** _outerItemOf — get outer data ****/
-
-  _outerItemOf (Id:string):SDS_Item | undefined {
-    const OuterId = this._outerItemIdOf(Id)
-    return OuterId != null ? this.#wrapItem(OuterId) : undefined
-  }
-
 /**** _outerItemIdOf — get outer item Id ****/
 
   _outerItemIdOf (Id:string):string | undefined {
     const EntryMap     = this.#EntriesMap.get(Id)
     const outerItemId  = EntryMap?.get('outerItemId') as string | undefined
     return (outerItemId != null && outerItemId !== '') ? outerItemId : undefined
-  }
-
-/**** _outerItemChainOf — get ancestor chain ****/
-
-  _outerItemChainOf (Id:string):SDS_Item[] {
-    const Result:SDS_Item[] = []
-    let currentId:string | undefined = this._outerItemIdOf(Id)
-    while (currentId != null) {
-      Result.push(this.#wrapItem(currentId))
-      if (currentId === RootId) { break }
-      currentId = this._outerItemIdOf(currentId)
-    }
-    return Result
-  }
-
-/**** _outerItemIdsOf — get ancestor IDs ****/
-
-  _outerItemIdsOf (Id:string):string[] {
-    return this._outerItemChainOf(Id).map((n) => n.Id)
   }
 
 /**** _innerEntriesOf — get sorted children as array-like proxy ****/
@@ -1301,14 +1306,14 @@ export class SDS_DataStore {
         if (Prop === Symbol.iterator) {
           return function* () {
             for (let i = 0; i < Sorted.length; i++) {
-              yield Store.#wrap(Sorted[i].Id)
+              yield Store.#wrapped(Sorted[i].Id)
             }
           }
         }
         if (typeof Prop === 'string' && ! isNaN(Number(Prop))) {
-          const Idx = Number(Prop)
-          return (Idx >= 0 && Idx < Sorted.length)
-            ? Store.#wrap(Sorted[Idx].Id)
+          const Index = Number(Prop)
+          return (Index >= 0 && Index < Sorted.length)
+            ? Store.#wrapped(Sorted[Index].Id)
             : undefined
         }
         return (_target as any)[Prop]
@@ -1338,61 +1343,91 @@ export class SDS_DataStore {
     if (! TargetId) {
       throw new SDS_Error('not-found', `link '${Id}' has no target`)
     }
-    return this.#wrapItem(TargetId)
+    return this.#wrappedItem(TargetId)
   }
 
-/**** _EntryAsJSON — serialize entry and subtree ****/
+/**** _currentValueOf — synchronously return the inline value of an item ****/
 
-  _EntryAsJSON (Id:string):unknown {
-    if (! this.#EntriesMap.has(Id)) {
-      throw new SDS_Error('not-found', `entry '${Id}' not found`)
-    }
-    const SubEntries:Record<string,any> = {}
-    this.#collectSubtree(Id, SubEntries)
-    return { Entries: SubEntries }
-  }
-
-/**** #collectSubtree — recursively serialize entry and descendants ****/
-
-  #collectSubtree (Id:string, Out:Record<string,any>):void {
-    const EntryMap = this.#EntriesMap.get(Id)
-    if (EntryMap == null) { return }
-
-    const outerItemId = EntryMap.get('outerItemId') as string | undefined
-    const OrderKey    = EntryMap.get('OrderKey') as string | undefined
-    const LabelVal    = EntryMap.get('Label')
-    const InfoMap     = EntryMap.get('Info') as Y.Map<any> | undefined
-    const Info:Record<string,any> = {}
-    if (InfoMap instanceof Y.Map) {
-      InfoMap.forEach((Val, Key) => { Info[Key] = Val })
-    }
-
-    const Entry:Record<string,any> = {
-      Kind:  EntryMap.get('Kind'),
-      Label: LabelVal instanceof Y.Text ? LabelVal.toString() : String(LabelVal ?? ''),
-      Info,
-    }
-    if (outerItemId && OrderKey) {
-      Entry['outerPlacement'] = { outerItemId:outerItemId, OrderKey }
-    }
-    if (EntryMap.get('Kind') === 'item') {
-      Entry['MIMEType']  = EntryMap.get('MIMEType') ?? ''
-      Entry['ValueKind'] = EntryMap.get('ValueKind') ?? 'none'
-      const LiteralVal = EntryMap.get('literalValue')
-      if (LiteralVal instanceof Y.Text) {
-        Entry['literalValue'] = LiteralVal.toString()
+  _currentValueOf (Id:string):string | Uint8Array | undefined {
+    const Kind = this._ValueKindOf(Id)
+    switch (true) {
+      case (Kind === 'literal'): {
+        const EntryMap   = this.#EntriesMap.get(Id)
+        const LiteralVal = EntryMap?.get('literalValue')
+        return LiteralVal instanceof Y.Text ? LiteralVal.toString() : (LiteralVal as string ?? '')
       }
-      const BinVal = EntryMap.get('binaryValue')
-      if (BinVal instanceof Uint8Array) { Entry['binaryValue'] = BinVal }
-      const ValueRef = EntryMap.get('ValueRef')
-      if (ValueRef != null) { Entry['ValueRef'] = ValueRef }
-    } else {
-      Entry['TargetId'] = EntryMap.get('TargetId')
+      case (Kind === 'binary'): {
+        const EntryMap = this.#EntriesMap.get(Id)
+        return EntryMap?.get('binaryValue') as Uint8Array | undefined
+      }
+      default:
+        return undefined
     }
-    Out[Id] = Entry
+  }
 
-    for (const innerEntryId of (this.#ReverseIndex.get(Id) ?? new Set())) {
-      this.#collectSubtree(innerEntryId, Out)
+/**** #collectEntryIds — build an old→new UUID map for all entries in the subtree ****/
+
+  #collectEntryIds (JSON_:SDS_EntryJSON, IdMap:Map<string,string>):void {
+    IdMap.set(JSON_.Id, crypto.randomUUID())
+    if (JSON_.Kind === 'item') {
+      for (const inner of (JSON_ as SDS_ItemJSON).innerEntries ?? []) {
+        this.#collectEntryIds(inner, IdMap)
+      }
+    }
+  }
+
+/**** #importEntryFromJSON — recursively create a Y.js entry and update indices ****/
+
+  #importEntryFromJSON (
+    JSON_:SDS_EntryJSON, outerItemId:string, OrderKey:string,
+    IdMap:Map<string,string>
+  ):void {
+    const newId    = IdMap.get(JSON_.Id)!
+    const EntryMap = new Y.Map<any>()
+    EntryMap.set('Kind',        JSON_.Kind)
+    EntryMap.set('outerItemId', outerItemId)
+    EntryMap.set('OrderKey',    OrderKey)
+    EntryMap.set('Label',       new Y.Text(JSON_.Label ?? ''))
+    const InfoMap = new Y.Map<any>()
+    for (const [Key, Val] of Object.entries(JSON_.Info ?? {})) { InfoMap.set(Key, Val) }
+    EntryMap.set('Info', InfoMap)
+
+    if (JSON_.Kind === 'item') {
+      const ItemJSON   = JSON_ as SDS_ItemJSON
+      const storedType = ItemJSON.Type === DefaultMIMEType ? '' : (ItemJSON.Type ?? '')
+      EntryMap.set('MIMEType', storedType)
+
+      switch (true) {
+        case (ItemJSON.ValueKind === 'literal' && ItemJSON.Value !== undefined): {
+          EntryMap.set('ValueKind',    'literal')
+          EntryMap.set('literalValue', new Y.Text(ItemJSON.Value!))
+          break
+        }
+        case (ItemJSON.ValueKind === 'binary' && ItemJSON.Value !== undefined): {
+          EntryMap.set('ValueKind',   'binary')
+          EntryMap.set('binaryValue', _base64ToUint8Array(ItemJSON.Value!))
+          break
+        }
+        default:
+          EntryMap.set('ValueKind', ItemJSON.ValueKind ?? 'none')
+      }
+
+      this.#EntriesMap.set(newId, EntryMap)
+      this.#addToReverseIndex(outerItemId, newId)
+
+      const FreshKeys = generateNKeysBetween(null, null, (ItemJSON.innerEntries ?? []).length)
+      ;(ItemJSON.innerEntries ?? []).forEach((innerJSON, i) => {
+        this.#importEntryFromJSON(innerJSON, newId, FreshKeys[i], IdMap)
+      })
+    } else {
+      const LinkJSON = JSON_ as SDS_LinkJSON
+      const TargetId = IdMap.has(LinkJSON.TargetId)
+        ? IdMap.get(LinkJSON.TargetId)!
+        : LinkJSON.TargetId
+      EntryMap.set('TargetId', TargetId ?? '')
+      this.#EntriesMap.set(newId, EntryMap)
+      this.#addToReverseIndex(outerItemId, newId)
+      if (TargetId) { this.#addToLinkTargetIndex(TargetId, newId) }
     }
   }
 

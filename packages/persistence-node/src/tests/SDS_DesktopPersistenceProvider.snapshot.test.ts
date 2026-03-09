@@ -38,7 +38,7 @@ describe('SDS_DesktopPersistenceProvider — Snapshot', () => {
     const { DbPath, cleanup } = makeTmpDb()
     try {
       const P    = new SDS_DesktopPersistenceProvider(DbPath, 'store-1')
-      const Item = new Uint8Array([1, 2, 3, 4, 5])
+      const Data = new Uint8Array([1, 2, 3, 4, 5])
       await P.saveSnapshot(Data)
       const Loaded = await P.loadSnapshot()
       expect(Loaded).not.toBeUndefined()
@@ -64,7 +64,7 @@ describe('SDS_DesktopPersistenceProvider — Snapshot', () => {
   it('PS-04: data survives close and reopen', async () => {
     const { DbPath, cleanup } = makeTmpDb()
     try {
-      const Item = new Uint8Array([10, 20, 30])
+      const Data = new Uint8Array([10, 20, 30])
       {
         const P = new SDS_DesktopPersistenceProvider(DbPath, 'store-1')
         await P.saveSnapshot(Data)

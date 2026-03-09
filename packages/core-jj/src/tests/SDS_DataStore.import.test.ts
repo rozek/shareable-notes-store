@@ -16,7 +16,7 @@ import { SDS_Link }      from '../store/SDS_Link.js'
 describe('SDS_DataStore — Import', () => {
   it('I-01: deserializeItemInto imports data into container', () => {
     const Store1 = SDS_DataStore.fromScratch()
-    const Item1  = Store1.newItemAt(Store1.RootItem)
+    const Item1  = Store1.newItemAt(undefined, Store1.RootItem)
     Item1.Label  = 'original'
 
     const Store2   = SDS_DataStore.fromScratch()
@@ -29,7 +29,7 @@ describe('SDS_DataStore — Import', () => {
 
   it('I-02: imported data gets a new Id', () => {
     const Store1 = SDS_DataStore.fromScratch()
-    const Item1  = Store1.newItemAt(Store1.RootItem)
+    const Item1  = Store1.newItemAt(undefined, Store1.RootItem)
 
     const Store2   = SDS_DataStore.fromScratch()
     const Imported = Store2.deserializeItemInto(Item1.asJSON(), Store2.RootItem)
@@ -39,7 +39,7 @@ describe('SDS_DataStore — Import', () => {
 
   it('I-03: imported data has same Label', () => {
     const Store1 = SDS_DataStore.fromScratch()
-    const Item1  = Store1.newItemAt(Store1.RootItem)
+    const Item1  = Store1.newItemAt(undefined, Store1.RootItem)
     Item1.Label  = 'copy this'
 
     const Store2   = SDS_DataStore.fromScratch()
@@ -50,7 +50,7 @@ describe('SDS_DataStore — Import', () => {
 
   it('I-04: imported data has same MIME type', () => {
     const Store1 = SDS_DataStore.fromScratch()
-    const Item1  = Store1.newItemAt(Store1.RootItem, 'text/markdown')
+    const Item1  = Store1.newItemAt('text/markdown', Store1.RootItem)
 
     const Store2   = SDS_DataStore.fromScratch()
     const Imported = Store2.deserializeItemInto(Item1.asJSON(), Store2.RootItem) as SDS_Item
@@ -60,9 +60,9 @@ describe('SDS_DataStore — Import', () => {
 
   it('I-05: nested items are imported with their structure', () => {
     const Store1  = SDS_DataStore.fromScratch()
-    const OuterItem  = Store1.newItemAt(Store1.RootItem)
-    const InnerItem1 = Store1.newItemAt(OuterItem)
-    const InnerItem2 = Store1.newItemAt(OuterItem)
+    const OuterItem  = Store1.newItemAt(undefined, Store1.RootItem)
+    const InnerItem1 = Store1.newItemAt(undefined, OuterItem)
+    const InnerItem2 = Store1.newItemAt(undefined, OuterItem)
 
     const Store2     = SDS_DataStore.fromScratch()
     const Imported   = Store2.deserializeItemInto(OuterItem.asJSON(), Store2.RootItem) as SDS_Item
@@ -72,13 +72,13 @@ describe('SDS_DataStore — Import', () => {
 
   it('I-06: deserializeLinkInto imports link into container', () => {
     const Store1  = SDS_DataStore.fromScratch()
-    const Target  = Store1.newItemAt(Store1.RootItem)
+    const Target  = Store1.newItemAt(undefined, Store1.RootItem)
     const Link1   = Store1.newLinkAt(Target, Store1.RootItem)
     Link1.Label   = 'link copy'
 
     const Store2     = SDS_DataStore.fromScratch()
     // target must exist in Store2 for the link to be valid
-    const Target2    = Store2.newItemAt(Store2.RootItem)
+    const Target2    = Store2.newItemAt(undefined, Store2.RootItem)
     const Imported   = Store2.deserializeLinkInto(Link1.asJSON(), Store2.RootItem) as SDS_Link
 
     expect(Imported).toBeInstanceOf(SDS_Link)
@@ -89,5 +89,15 @@ describe('SDS_DataStore — Import', () => {
   it('I-07: invalid serialisation throws SDS_Error invalid-argument', () => {
     const Store = SDS_DataStore.fromScratch()
     expect(() => Store.deserializeItemInto(null, Store.RootItem)).toThrow()
+  })
+
+  it('I-08: imported item preserves literal value', async () => {
+    const Store1   = SDS_DataStore.fromScratch()
+    const Item1    = Store1.newItemAt(undefined, Store1.RootItem)
+    Item1.writeValue('preserved')
+
+    const Store2   = SDS_DataStore.fromScratch()
+    const Imported = Store2.deserializeItemInto(Item1.asJSON(), Store2.RootItem)
+    expect(await Imported.readValue()).toBe('preserved')
   })
 })

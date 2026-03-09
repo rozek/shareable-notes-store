@@ -70,25 +70,27 @@ Every mutation (or batch of mutations in a `transact()` block) produces a `SDS_C
 
 ```typescript
 SDS_DataStore.fromScratch (Options?: SDS_DataStoreOptions):SDS_DataStore
-SDS_DataStore.fromBinary (Data:Uint8Array, Options?: SDS_DataStoreOptions):SDS_DataStore
+SDS_DataStore.fromBinary (Data:Uint8Array, Options?:SDS_DataStoreOptions):SDS_DataStore
 SDS_DataStore.fromJSON (Data:unknown, Options?:SDS_DataStoreOptions):SDS_DataStore
 ```
 
+`fromScratch` creates a new, empty store pre-populated with `RootItem`, `TrashItem`, and `LostAndFoundItem`. `fromBinary` restores a store from a gzip-compressed snapshot (as produced by `store.asBinary()`). `fromJSON` restores a store from a plain JSON object or a JSON string (as produced by `store.asJSON()`).
+
 ```typescript
 interface SDS_DataStoreOptions {
-  LiteralSizeLimit?:     number  // max inline string length in UTF-16 code units (default 131_072)
-  TrashTTLms?:           number  // ms after which a trashed entry is eligible for auto-purge (default: disabled)
-  TrashCheckIntervalMs?: number  // how often the auto-purge timer fires (default: min(TrashTTLms/4, 3_600_000))
+  LiteralSizeLimit?:number      // max inline string length in UTF-16 code units (default 131_072)
+  TrashTTLms?:number            // ms after which a trashed entry is eligible for auto-purge (default: 30 days = 2_592_000_000; set to 0 to disable)
+  TrashCheckIntervalMs?: number // how often the auto-purge timer fires (default: min(TrashTTLms/4, 3_600_000))
 }
 ```
 
-When `TrashTTLms` is set, `SDS_DataStore` starts an internal `setInterval` that calls `purgeExpiredTrashEntries()` at the configured interval. Call `dispose()` to stop the timer when the store is no longer needed.
+Unless `TrashTTLms` is explicitly set to `0`, `SDS_DataStore` starts an internal `setInterval` that calls `purgeExpiredTrashEntries()` at the configured interval. Call `dispose()` to stop the timer when the store is no longer needed.
 
 #### Well-known items
 
 ```typescript
-readonly RootItem:        SDS_Item
-readonly TrashItem:       SDS_Item
+readonly RootItem:SDS_Item
+readonly TrashItem:SDS_Item
 readonly LostAndFoundItem:SDS_Item
 ```
 
@@ -96,13 +98,14 @@ readonly LostAndFoundItem:SDS_Item
 
 ```typescript
 newItemAt (
-  Container:SDS_Item,
-  InsertionIndex?: number    // position within Container.innerEntryList (appends if omitted)
+  MIMEType:string | undefined, // MIME type (default 'text/plain')
+  outerItem:SDS_Item,
+  InsertionIndex?:number       // position within outerItem.innerEntryList (appends if omitted)
 ):SDS_Item
 
 newLinkAt (
   Target:SDS_Item,
-  Container:SDS_Item,
+  outerItem:SDS_Item,
   InsertionIndex?:number
 ):SDS_Link
 ```
@@ -116,18 +119,31 @@ EntryWithId (EntryId:string):SDS_Entry | undefined
 #### Importing serialised entries
 
 ```typescript
-deserializeItemInto (Data:unknown, Container:SDS_Item, InsertionIndex?:number):SDS_Item
-deserializeLinkInto (Data:unknown, Container:SDS_Item, InsertionIndex?:number):SDS_Link
+deserializeItemInto (Data:unknown, outerItem:SDS_Item, InsertionIndex?:number):SDS_Item
+deserializeLinkInto (Data:unknown, outerItem:SDS_Item, InsertionIndex?:number):SDS_Link
+
+newEntryFromBinaryAt (Data:Uint8Array, outerItem:SDS_Item, InsertionIndex?:number):SDS_Entry
+newEntryFromJSONat   (Data:unknown,    outerItem:SDS_Item, InsertionIndex?:number):SDS_Entry
 ```
+
+`newEntryFromBinaryAt` accepts a gzip-compressed binary snapshot (as produced by `entry.asBinary()`); `newEntryFromJSONat` accepts a plain JSON object (as produced by `entry.asJSON()`). Both methods reconstruct the full entry subtree (including all inner entries) and insert it into `outerItem` at the given position. Unlike `deserializeItemInto`/`deserializeLinkInto`, they automatically detect whether the root is an item or a link.
 
 #### Moving entries
 
 ```typescript
-EntryMayBeMovedTo (Entry:SDS_Entry, Container:SDS_Item, InsertionIndex?: number):boolean
-moveEntryTo (Entry:SDS_Entry, Container:SDS_Item, InsertionIndex?:number):void
+EntryMayBeMovedTo (Entry:SDS_Entry, outerItem:SDS_Item, InsertionIndex?:number):boolean
+moveEntryTo (Entry:SDS_Entry, outerItem:SDS_Item, InsertionIndex?:number):void
 ```
 
 Throws `SDS_Error('move-would-cycle')` if the move would create a cycle in the tree.
+
+#### Rebalancing order keys
+
+```typescript
+rebalanceInnerEntriesOf (item:SDS_Item):void
+```
+
+Reassigns fresh, evenly-spaced fractional-indexing keys to all direct inner entries of `item`. This is called **automatically** whenever a new `OrderKey` would exceed 200 characters, so manual calls are only needed as a proactive measure before predictably degenerate bulk operations (see [Order keys](#order-keys) below).
 
 #### Deleting and purging entries
 
@@ -157,6 +173,8 @@ transact (Callback:() => void):void
 
 Groups multiple mutations into a single CRDT operation and emits exactly one ChangeSet event. Transactions may be nested, but inner ones have no extra effect.
 
+> **No rollback:** If the callback throws, any CRDT mutations already applied within the transaction are **not** rolled back. Guard against partial writes with explicit precondition checks before mutating.
+
 #### Events
 
 ```typescript
@@ -176,11 +194,13 @@ applyRemotePatch (encodedPatch:Uint8Array):void
 recoverOrphans ():void  // rescue entries whose outer item no longer exists
 ```
 
+> **Backend compatibility:** `SDS_SyncCursor` values and `exportPatch` payloads are opaque binary blobs whose format is specific to the backend (YJS, LORO, or JJ). Cursors and patches produced by one backend must **never** be passed to a store using a different backend.
+
 #### Serialisation
 
 ```typescript
 asBinary ():Uint8Array  // gzip-compressed full snapshot
-asJSON ():unknown       // base64-encoded binary (JSON-safe)
+asJSON ():unknown       // full snapshot as a plain JSON object (binary values are base64-encoded)
 ```
 
 ---
@@ -192,20 +212,20 @@ asJSON ():unknown       // base64-encoded binary (JSON-safe)
 ```typescript
 readonly Id:string
 
-get isRootItem:        boolean
-get isTrashItem:       boolean
+get isRootItem:boolean
+get isTrashItem:boolean
 get isLostAndFoundItem:boolean
-get isItem:            boolean
-get isLink:            boolean
+get isItem:boolean
+get isLink:boolean
 ```
 
 #### Hierarchy
 
 ```typescript
-get outerItem:      SDS_Item | undefined  // direct container
-get outerItemId:    string | undefined
-get outerItemChain: SDS_Item[]            // ancestor chain, innermost first
-get outerItemIds:   string[]
+get outerItem:SDS_Item | undefined  // direct container
+get outerItemId:string | undefined
+get outerItemChain:SDS_Item[]       // ancestor chain, innermost first
+get outerItemIds:string[]
 ```
 
 #### Label and metadata
@@ -220,14 +240,15 @@ get Info:Record<string,unknown>  // live proxy; assignments are CRDT mutations
 #### Convenience methods
 
 ```typescript
-mayBeMovedTo (Container:SDS_Item, InsertionIndex?:number):boolean
-moveTo (Container:SDS_Item, InsertionIndex?:number):void
+mayBeMovedTo (outerItem:SDS_Item, InsertionIndex?:number):boolean
+moveTo (outerItem:SDS_Item, InsertionIndex?:number):void
 
 get mayBeDeleted:boolean
 delete ():void
 purge ():void
 
-asJSON ():unknown
+asBinary ():Uint8Array  // serialises this entry subtree as a gzip-compressed binary snapshot
+asJSON ():unknown        // serialises this entry subtree as a plain JSON object
 ```
 
 ---
@@ -255,6 +276,8 @@ writeValue (Value:string | Uint8Array | undefined):void
 changeValue (fromIndex:number, toIndex:number, Replacement:string):void
 ```
 
+`readValue` resolves immediately when the value is stored inline (`ValueKind` is `'literal'` or `'binary'`). For reference kinds (`'literal-reference'`, `'binary-reference'`) it fetches the payload from the configured `ValueStore` and resolves asynchronously. There is no synchronous alternative. Returns `undefined` when `ValueKind` is `'none'` or `'pending'`.
+
 Throws `SDS_Error('change-value-not-literal')` if `ValueKind !== 'literal'`.
 
 #### Inner entries
@@ -267,9 +290,13 @@ get innerEntryList:SDS_Entry[]
 
 ### `SDS_Link` (extends `SDS_Entry`)
 
+A link is a pointer entry that references another item. It is useful for aliases, cross-references, and many-to-one relationships — for example, tagging an item that lives in one part of the tree from multiple other locations.
+
 ```typescript
-get Target:SDS_Item  // fixed at creation time
+get Target:SDS_Item  // fixed at creation time; cannot be changed after creation
 ```
+
+A link's target is **immutable** — once created, `Target` never changes. Deleting a link does not affect the target item. If a link reachable from `RootItem` points at an item that is in `TrashItem`, `purgeEntry` on that item will throw `SDS_Error('purge-protected')` until the link itself is deleted first.
 
 ---
 
@@ -279,14 +306,14 @@ get Target:SDS_Item  // fixed at creation time
 
 ```typescript
 class SDS_Error extends Error {
-  readonly Code:string
+  readonly code:string
   constructor (Code:string, Message:string)
 }
 ```
 
 Thrown by all SDS packages on invalid arguments or invalid state.
 
-Common error codes: `'invalid-argument'`, `'move-would-cycle'`, `'delete-not-permitted'`, `'purge-not-in-trash'`, `'purge-protected'`, `'change-value-not-literal'`.
+Common error codes: `'invalid-argument'`, `'move-would-cycle'`, `'delete-not-permitted'`, `'purge-not-in-trash'`, `'purge-protected'`, `'change-value-not-literal'`, `'not-implemented'`.
 
 ---
 
@@ -304,8 +331,8 @@ Delivered to `onChangeInvoke` handlers after every mutation. The ChangeSet maps 
 ### `SDS_SyncCursor` / `SDS_PatchSeqNumber`
 
 ```typescript
-type SDS_SyncCursor     = Uint8Array  // opaque; format is backend-specific
-type SDS_PatchSeqNumber = number      // maintained by SDS_SyncEngine
+type SDS_SyncCursor = Uint8Array // opaque; format is backend-specific
+type SDS_PatchSeqNumber = number // maintained by SDS_SyncEngine
 ```
 
 ---
@@ -341,8 +368,8 @@ Implemented by `@rozek/sds-persistence-browser` (IndexedDB) and `@rozek/sds-pers
 type SDS_ConnectionState = 'disconnected' | 'connecting' | 'connected' | 'reconnecting'
 
 interface SDS_ConnectionOptions {
-  Token:string               // JWT
-  reconnectDelayMs?:number   // auto-reconnect backoff in ms (default 2000)
+  Token:string             // JWT
+  reconnectDelayMs?:number // auto-reconnect backoff in ms (default 2000)
 }
 
 interface SDS_NetworkProvider {
@@ -380,8 +407,8 @@ interface SDS_LocalPresenceState {
 }
 
 interface SDS_RemotePresenceState extends SDS_LocalPresenceState {
-  PeerId:string    // always present for remote peers
-  lastSeen:number  // Date.now() timestamp of last received update
+  PeerId:string   // always present for remote peers
+  lastSeen:number // Date.now() timestamp of last received update
 }
 
 interface SDS_PresenceProvider {
@@ -394,6 +421,48 @@ interface SDS_PresenceProvider {
 ```
 
 Usually implemented by the same class as `SDS_NetworkProvider` (`@rozek/sds-network-websocket` and `@rozek/sds-network-webrtc` both implement both interfaces).
+
+---
+
+## Validation limits
+
+All three backends enforce the same hard limits on user-supplied strings and metadata. Exceeding any limit throws `SDS_Error('invalid-argument')` with a descriptive message that includes the actual length and the limit.
+
+| Field | Constant | Default | Checked in |
+|---|---|---|---|
+| `Label` | `maxLabelLength` | 1 024 chars | `entry.Label = …` |
+| `MIMEType` | `maxMIMETypeLength` | 256 chars | `item.Type = …`, `newItemAt(…, mimeType)` |
+| `Info` key | `maxInfoKeyLength` | 1 024 chars | `entry.Info['key'] = …` |
+| `Info` value | `maxInfoValueSize` | 1 048 576 bytes (UTF-8 JSON) | `entry.Info['key'] = …` |
+
+Info values must also be JSON-serialisable; functions, symbols, and circular references are rejected.
+
+All four constants are exported from `@rozek/sds-core` so that application code can display the limits to users without hard-coding them.
+
+---
+
+## Order keys
+
+Entries within a container are sorted by a string called `OrderKey`, generated by the [fractional-indexing](https://github.com/rocicorp/fractional-indexing) algorithm. These keys grow in length each time a new entry is inserted between two neighbours that already have adjacent keys. Under normal usage (appending, prepending, or occasional reordering) keys remain short. With repeated insertions at the same gap the keys can grow arbitrarily long.
+
+### Automatic rebalancing
+
+All three backends automatically trigger `rebalanceInnerEntriesOf` inside the same transaction whenever a newly generated `OrderKey` would exceed **200 characters**. Under normal usage this threshold is never reached, so the auto-trigger adds no overhead. In degenerate patterns (e.g. always inserting at position 0 in a large container), the rebalancing fires once and then the keys are short again for the next batch of operations.
+
+### Manual rebalancing
+
+Call `rebalanceInnerEntriesOf` explicitly as a proactive measure before bulk operations where you know the same gap will be used many times in a row:
+
+```typescript
+Store.rebalanceInnerEntriesOf(targetItem)
+for (const record of largeImport) {
+  Store.newItemAt('application/json', targetItem, 0)  // always inserts at position 0
+}
+```
+
+### CRDT safety
+
+`rebalanceInnerEntriesOf` is a normal CRDT mutation — it updates the `OrderKey` field of every direct inner entry in a single transaction that syncs to all peers. There is one caveat: if a remote peer inserts an entry at a gap that is being rebalanced concurrently, the new entry may land in a slightly different relative position than intended. No data is lost and all peers converge to the same order; the only effect is a potential one-time positional surprise during the brief window of concurrent activity.
 
 ---
 

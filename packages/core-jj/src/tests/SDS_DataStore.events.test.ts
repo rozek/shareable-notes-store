@@ -16,7 +16,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Store   = SDS_DataStore.fromScratch()
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     expect(Handler).toHaveBeenCalledOnce()
   })
 
@@ -24,7 +24,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Store   = SDS_DataStore.fromScratch()
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     const ChangeSet = Handler.mock.calls[0][1]
     expect(ChangeSet[Item.Id]).toBeDefined()
     expect(ChangeSet[Store.RootItem.Id]).toBeDefined()
@@ -34,7 +34,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Store   = SDS_DataStore.fromScratch()
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     const ChangeSet = Handler.mock.calls[0][1]
     expect(ChangeSet[Item.Id]?.has('outerItem')).toBe(true)
   })
@@ -43,7 +43,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Store   = SDS_DataStore.fromScratch()
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     const ChangeSet = Handler.mock.calls[0][1]
     expect(ChangeSet[Store.RootItem.Id]?.has('innerEntryList')).toBe(true)
   })
@@ -60,7 +60,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Handler     = vi.fn()
     const Unsubscribe = Store.onChangeInvoke(Handler)
     Unsubscribe()
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     expect(Handler).not.toHaveBeenCalled()
   })
 
@@ -70,7 +70,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const HandlerB = vi.fn()
     Store.onChangeInvoke(HandlerA)
     Store.onChangeInvoke(HandlerB)
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     expect(HandlerA).toHaveBeenCalledOnce()
     expect(HandlerB).toHaveBeenCalledOnce()
   })
@@ -80,9 +80,9 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
     Store.transact(() => {
-      Store.newItemAt(Store.RootItem)
+      Store.newItemAt(undefined, Store.RootItem)
       Store.transact(() => {
-        Store.newItemAt(Store.RootItem)
+        Store.newItemAt(undefined, Store.RootItem)
       })
     })
     expect(Handler).toHaveBeenCalledOnce()
@@ -92,7 +92,7 @@ describe('SDS_DataStore — Events & Transact', () => {
     const Store   = SDS_DataStore.fromScratch()
     const Handler = vi.fn()
     Store.onChangeInvoke(Handler)
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     expect(Handler.mock.calls[0][0]).toBe('internal')
   })
 })

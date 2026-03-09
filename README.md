@@ -8,6 +8,15 @@ Data Items are organised in a hierarchy (with optional links between them), can 
 
 The CRDT engine is **pluggable**: choose from three ready-made backends or write your own: [Y.js](https://yjs.dev/), [Loro CRDT](https://loro.dev/) or [JSON JOY](https://jsonjoy.com/).
 
+### Current Roadmap
+
+Next steps:
+
+- \[ \] CLI Interface - access your stores from the command line
+- \[ \] MCP Server - access your stores from any MCP-capable AI
+- \[ \] Applications - some concrete applications (e.g., a shareable notebook similar Obsidian or Notion)
+- \[ \] (not yet to be revealed)
+
 ---
 
 ## Packages
@@ -183,7 +192,7 @@ import { serve }           from '@hono/node-server'
 
 const { app:App } = createSDSServer({ JWTSecret:'your-secret-at-least-32-chars' })
 
-serve({ fetch:App.fetch, port:3000 }, () => {
+serve({ fetch:App.fetch, Port:3000 }, () => {
   console.log('SDS relay server listening on port 3000')
 })
 ```
@@ -345,7 +354,7 @@ The sync engine and all persistence providers treat the cursor as an opaque blob
 
 Binary snapshots and CRDT patches are **not cross-compatible** between backends. To migrate existing data from one backend to another:
 
-1. Load your data with the **old** backend:
+1. load your data with the **old** backend:
 
    ```typescript
    // Example: migrate from json-joy to Y.js
@@ -355,7 +364,7 @@ Binary snapshots and CRDT patches are **not cross-compatible** between backends.
    const oldContents = oldStore.fromBinary(existingSnapshot)
    ```
 
-2. Export all entries as JSON:
+2. export all entries as JSON:
 
    ```typescript
    const allEntries = oldContents.asJSON()
@@ -367,7 +376,7 @@ Binary snapshots and CRDT patches are **not cross-compatible** between backends.
    const newContents = newStore.fromJSON(allEntries)
    ```
 
-4. Re-persist the new store:
+4. re-persist the new store:
 
    ```typescript
    const newSnapshot = newContents.asBinary()
@@ -376,10 +385,10 @@ Binary snapshots and CRDT patches are **not cross-compatible** between backends.
 
 **Important items:**
 
-- The JSON export/import path preserves all Labels, Values, Info keys, MIME types, and the tree structure, but does **not** preserve CRDT history. Every peer receiving the migrated snapshot will see it as a single atomic origin — there is no incremental patch history to replay.
-- If you run multiple peers, all peers must migrate simultaneously to the same backend. A json-joy peer and a Y.js peer cannot exchange patches.
-- After migration, re-initialise your persistence store (clear old `patches` and `snapshots` rows and seed with the new binary snapshot).
-- All `SDS_SyncCursor` values stored in the database are backend-specific and must be discarded on migration.
+- the JSON export/import path preserves all Labels, Values, Info keys, MIME types, and the tree structure, but does **not** preserve CRDT history. Every peer receiving the migrated snapshot will see it as a single atomic origin — there is no incremental patch history to replay.
+- if you run multiple peers, all peers must migrate simultaneously to the same backend. A json-joy peer and a Y.js peer cannot exchange patches.
+- after migration, re-initialise your persistence store (clear old `patches` and `snapshots` rows and seed with the new binary snapshot).
+- all `SDS_SyncCursor` values stored in the database are backend-specific and must be discarded on migration.
 
 ---
 
@@ -437,25 +446,25 @@ onChangeInvoke (Handler:ChangeHandler):() => void
 **Properties**
 
 ```typescript
-get RootItem ():         SDS_Item
-get TrashItem ():        SDS_Item
-get LostAndFoundItem (): SDS_Item
+get RootItem ():SDS_Item
+get TrashItem ():SDS_Item
+get LostAndFoundItem ():SDS_Item
 ```
 
 **Data storage constraints**
 
-- Store entries in a flat map keyed by UUID (no nested tree in the CRDT layer).
-- Each entry must expose at minimum: `Kind`, `outerItemId`, `OrderKey`, `Label`, `Info`, `MIMEType`, `ValueKind` and the appropriate value field.
-- Use `fractional-indexing` for `OrderKey` generation to maintain collaborative ordering.
-- Maintain in-memory `#ReverseIndex`, `#ForwardIndex`, `#LinkTargetIndex`, `#LinkForwardIndex`, and `#WrapperCache` for efficient traversal and incremental updates.
-- Re-use the `SDS_Entry`, `SDS_Item`, and `SDS_Link` classes from `@rozek/sds-core` (or copy and adapt them) — they delegate all CRDT operations back to the store via bracket-notation calls (`this._Store['_method']()`).
+- store entries in a flat map keyed by UUID (no nested tree in the CRDT layer).
+- each entry must expose at minimum: `Kind`, `outerItemId`, `OrderKey`, `Label`, `Info`, `MIMEType`, `ValueKind` and the appropriate value field.
+- use `fractional-indexing` for `OrderKey` generation to maintain collaborative ordering.
+- maintain in-memory `#ReverseIndex`, `#ForwardIndex`, `#LinkTargetIndex`, `#LinkForwardIndex`, and `#WrapperCache` for efficient traversal and incremental updates.
+- re-use the `SDS_Entry`, `SDS_Item`, and `SDS_Link` classes from `@rozek/sds-core` (or copy and adapt them) — they delegate all CRDT operations back to the store via bracket-notation calls (`this._Store['_method']()`).
 
 **Change notifications**
 
-- Maintain a `#TransactDepth` counter. Increment it on entry, decrement on exit.
-- Collect a `SDS_ChangeSet` during the transaction.
-- Fire all registered `ChangeHandler`s exactly once when the outermost transaction completes.
-- Remote patches must fire handlers with `Origin = 'external'`; local mutations with `Origin = 'internal'`.
+- maintain a `#TransactDepth` counter. Increment it on entry, decrement on exit.
+- collect a `SDS_ChangeSet` during the transaction.
+- fire all registered `ChangeHandler`s exactly once when the outermost transaction completes.
+- remote patches must fire handlers with `Origin = 'external'`; local mutations with `Origin = 'internal'`.
 
 ### Package structure
 

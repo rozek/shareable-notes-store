@@ -39,9 +39,9 @@ pnpm add @rozek/sds-websocket-server @rozek/sds-persistence-node better-sqlite3
 import { createSDSServer } from '@rozek/sds-websocket-server'
 import { serve }           from '@hono/node-server'
 
-const { app:app } = createSDSServer({ JWTSecret:'your-secret-at-least-32-chars' })
+const { app:App } = createSDSServer({ JWTSecret:'your-secret-at-least-32-chars' })
 
-serve({ fetch:app.fetch, port:3000 }, () => {
+serve({ fetch:App.fetch, port:3000 }, () => {
   console.log('SDS server listening on http://localhost:3000')
 })
 ```
@@ -62,7 +62,7 @@ node server.js
 ### `createSDSServer`
 
 ```typescript
-function createSDSServer(Options?: Partial<SDS_ServerOptions>):{ app:Hono }
+function createSDSServer (Options?:Partial<SDS_ServerOptions>):{ app:Hono }
 ```
 
 Returns the configured Hono application. Pass `app.fetch` to `@hono/node-server`'s `serve()`.
@@ -179,11 +179,11 @@ Content-Type: application/json
 ```typescript
 // per-store client registry
 class LiveStore {
-  constructor(StoreId:string)
-  addClient(Client:LiveClient):void
-  removeClient(Client:LiveClient):void
-  isEmpty():boolean
-  broadcast(Data:Uint8Array, Sender:LiveClient):void
+  constructor (StoreId:string)
+  addClient (Client:LiveClient):void
+  removeClient (Client:LiveClient):void
+  isEmpty ():boolean
+  broadcast (Data:Uint8Array, Sender:LiveClient):void
 }
 
 // returns true if a frame of type `MsgType` must be dropped for read-scope clients
@@ -206,11 +206,11 @@ interface LiveClient {
 import { createSDSServer } from '@rozek/sds-websocket-server'
 import { serve }           from '@hono/node-server'
 
-const secret = 'super-secret-key-at-least-32-chars!!'
+const Secret = 'super-secret-key-at-least-32-chars!!'
 
-const { app:app } = createSDSServer({ JWTSecret:secret, Port:3000 })
+const { app:App } = createSDSServer({ JWTSecret:secret, Port:3000 })
 
-serve({ fetch:app.fetch, port:3000 })
+serve({ fetch:App.fetch, Port:3000 })
 
 // clients connect to wss://host/ws/<storeId>?token=<jwt>
 // admins issue tokens via POST /api/token (authenticated with an admin JWT)
@@ -221,16 +221,16 @@ serve({ fetch:app.fetch, port:3000 })
 ```typescript
 import { SignJWT } from 'jose'
 
-const secret = new TextEncoder().encode('super-secret-key-at-least-32-chars!!')
+const Secret = new TextEncoder().encode('super-secret-key-at-least-32-chars!!')
 
-const token = await new SignJWT({ sub:'alice', aud:'my-store', scope:'write' })
+const Token = await new SignJWT({ sub:'alice', aud:'my-store', scope:'write' })
   .setProtectedHeader({ alg:'HS256' })
   .setIssuedAt()
   .setExpirationTime('1h')
-  .sign(secret)
+  .sign(Secret)
 
 // pass this token to the client so it can connect:
-// wss://host/ws/my-store?token=<token>
+// wss://host/ws/my-store?token=<Token>
 ```
 
 ### Behind a reverse proxy (Caddy / nginx)

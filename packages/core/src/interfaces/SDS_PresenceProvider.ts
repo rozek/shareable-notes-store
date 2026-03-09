@@ -7,23 +7,23 @@
 // usually implemented by the same class as SDS_NetworkProvider
 // (WebSocket and WebRTC providers both implement this).
 
-export interface SDS_LocalPresenceState {
-  PeerId?:string // injected by the engine before transmission; not set by  user
-  UserName?:string
-  UserColor?:string
-  UserFocus?: {
-    EntryId: string
-    Property:'Value' | 'Label' | 'Info'
-    Cursor?: { from:number; to:number }
+  export interface SDS_LocalPresenceState {
+    PeerId?:string// injected by the engine before transmission; not set by user
+    UserName?:string
+    UserColor?:string
+    UserFocus?: {
+      EntryId: string
+      Property:'Value' | 'Label' | 'Info'
+      Cursor?: { from:number; to:number }
                     // only set when (property === 'Value') and value is literal
+    }
+    custom?:unknown              // arbitrary JSON-serialisable application data
   }
-  custom?:unknown                // arbitrary JSON-serialisable application data
-}
 
-export interface SDS_RemotePresenceState extends SDS_LocalPresenceState {
-  PeerId:string                               // always present for remote peers
-  lastSeen:number                                        // Date.now() timestamp
-}
+  export interface SDS_RemotePresenceState extends SDS_LocalPresenceState {
+    PeerId:string                             // always present for remote peers
+    lastSeen:number                                      // Date.now() timestamp
+  }
 
 export interface SDS_PresenceProvider {
 

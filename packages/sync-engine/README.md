@@ -48,32 +48,32 @@ When running in a browser or Tauri context, the engine optionally uses a `Broadc
 import { SDS_SyncEngine } from '@rozek/sds-sync-engine'
 
 class SDS_SyncEngine {
-  constructor(Store:SDS_DataStore, Options?: SDS_SyncEngineOptions)
+  constructor (Store:SDS_DataStore, Options?:SDS_SyncEngineOptions)
 
   // ── Lifecycle ────────────────────────────────────────────────
 
-  start():Promise<void>   // restore, wire providers
-  stop():  Promise<void>   // flush queue, write checkpoint, close providers
+  start ():Promise<void>   // restore, wire providers
+  stop ():Promise<void>    // flush queue, write checkpoint, close providers
 
   // ── Network ──────────────────────────────────────────────────
 
-  connectTo(URL:string, Options:SDS_ConnectionOptions):Promise<void>
-  disconnect():void
-  reconnect():Promise<void>
+  connectTo (URL:string, Options:SDS_ConnectionOptions):Promise<void>
+  disconnect ():void
+  reconnect ():Promise<void>
 
-  get ConnectionState():SDS_ConnectionState
-  onConnectionChange(Callback:(State:SDS_ConnectionState) => void):() => void
+  get ConnectionState ():SDS_ConnectionState
+  onConnectionChange (Callback:(State:SDS_ConnectionState) => void):() => void
 
   // ── Presence ─────────────────────────────────────────────────
 
   readonly PeerId:string   // unique identifier for this engine instance (UUID)
 
-  setPresenceTo(State:SDS_LocalPresenceState):void
+  setPresenceTo (State:SDS_LocalPresenceState):void
   readonly PeerSet:ReadonlyMap<string, SDS_RemotePresenceState>
   onPresenceChange(
     Callback:(
-      PeerId:  string,
-      State:   SDS_RemotePresenceState | undefined,
+      PeerId:string,
+      State: SDS_RemotePresenceState | undefined,
       Origin:'local' | 'remote'
     ) => void
   ):() => void
@@ -84,11 +84,11 @@ class SDS_SyncEngine {
 
 ```typescript
 interface SDS_SyncEngineOptions {
-  PersistenceProvider?: SDS_PersistenceProvider  // SQLite or IndexedDB
-  NetworkProvider?:     SDS_NetworkProvider       // WebSocket or WebRTC
-  PresenceProvider?:    SDS_PresenceProvider      // often the same as NetworkProvider
-  BroadcastChannel?:    boolean                   // cross-tab relay (default: true in browser)
-  PresenceTimeoutMs?:   number                    // peer inactivity timeout (default: 120 000 ms)
+  PersistenceProvider?:SDS_PersistenceProvider  // SQLite or IndexedDB
+  NetworkProvider?:    SDS_NetworkProvider       // WebSocket or WebRTC
+  PresenceProvider?:   SDS_PresenceProvider      // often the same as NetworkProvider
+  BroadcastChannel?:   boolean                   // cross-tab relay (default: true in browser)
+  PresenceTimeoutMs?:  number                    // peer inactivity timeout (default: 120 000 ms)
 }
 ```
 
@@ -97,7 +97,7 @@ All providers are optional. You can use any combination — for example persiste
 ### Error codes
 
 | Code | Thrown by | Reason |
-|---|---|---|
+| --- | --- | --- |
 | `'no-network-provider'` | `connectTo()` | No `NetworkProvider` was configured |
 | `'not-yet-connected'` | `reconnect()` | `connectTo()` has never been called successfully |
 

@@ -84,7 +84,7 @@ const Patch = DataStoreA.exportPatch()
 DataStoreB.applyRemotePatch(Patch)
 
 // both peers now agree
-const ItemB = DataStoreB.EntryWithId(Data.Id)
+const ItemB = DataStoreB.EntryWithId(ItemA.Id)
 console.log(ItemB?.Label)  // 'shared data'
 ```
 

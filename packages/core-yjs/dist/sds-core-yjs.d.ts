@@ -1,6 +1,10 @@
+import { ChangeHandler } from '@rozek/sds-core';
+import { ChangeOrigin } from '@rozek/sds-core';
 import { SDS_ChangeSet } from '@rozek/sds-core';
 import { SDS_ConnectionOptions } from '@rozek/sds-core';
 import { SDS_ConnectionState } from '@rozek/sds-core';
+import { SDS_DataStore as SDS_DataStore_2 } from '@rozek/sds-core';
+import { SDS_DataStoreOptions } from '@rozek/sds-core';
 import { SDS_Entry } from '@rozek/sds-core';
 import { SDS_EntryChangeSet } from '@rozek/sds-core';
 import { SDS_Error } from '@rozek/sds-core';
@@ -14,9 +18,9 @@ import { SDS_PresenceProvider } from '@rozek/sds-core';
 import { SDS_RemotePresenceState } from '@rozek/sds-core';
 import { SDS_SyncCursor } from '@rozek/sds-core';
 
-export declare type ChangeHandler = (Origin: ChangeOrigin, ChangeSet: SDS_ChangeSet) => void;
+export { ChangeHandler }
 
-export declare type ChangeOrigin = 'internal' | 'external';
+export { ChangeOrigin }
 
 export { SDS_ChangeSet }
 
@@ -24,7 +28,7 @@ export { SDS_ConnectionOptions }
 
 export { SDS_ConnectionState }
 
-export declare class SDS_DataStore {
+export declare class SDS_DataStore extends SDS_DataStore_2 {
     #private;
     /**** constructor — initialise store from document and options ****/
     private constructor();
@@ -32,28 +36,26 @@ export declare class SDS_DataStore {
     static fromScratch(Options?: SDS_DataStoreOptions): SDS_DataStore;
     /**** fromBinary — restore store from compressed update ****/
     static fromBinary(Data: Uint8Array, Options?: SDS_DataStoreOptions): SDS_DataStore;
-    /**** fromJSON — restore store from base64-encoded data ****/
-    static fromJSON(Data: unknown, Options?: SDS_DataStoreOptions): SDS_DataStore;
+    /**** fromJSON — restore store from a plain JSON object or its JSON.stringify representation ****/
+    static fromJSON(Serialisation: unknown, Options?: SDS_DataStoreOptions): SDS_DataStore;
     /**** RootItem / TrashItem / LostAndFoundItem — access system items ****/
     get RootItem(): SDS_Item;
     get TrashItem(): SDS_Item;
     get LostAndFoundItem(): SDS_Item;
-    /**** EntryWithId — retrieve entry by ID ****/
+    /**** EntryWithId — retrieve entry by Id ****/
     EntryWithId(EntryId: string): SDS_Entry | undefined;
-    /**** newItemAt — create data as inner data of outer data ****/
-    newItemAt(OuterItem: SDS_Item, Type?: string, InsertionIndex?: number): SDS_Item;
+    /**** newItemAt — create a new item of given type as inner entry of outerItem ****/
+    newItemAt(MIMEType: string | undefined, outerItem: SDS_Item, InsertionIndex?: number): SDS_Item;
     /**** newLinkAt — create link as inner link of outer data ****/
-    newLinkAt(Target: SDS_Item, OuterItem: SDS_Item, InsertionIndex?: number): SDS_Link;
-    /**** deserializeItemInto — import data subtree with remapped IDs ****/
-    deserializeItemInto(Serialization: unknown, OuterItem: SDS_Item, InsertionIndex?: number): SDS_Item;
-    /**** deserializeLinkInto — import link with remapped target ID ****/
-    deserializeLinkInto(Serialization: unknown, OuterItem: SDS_Item, InsertionIndex?: number): SDS_Link;
-    /**** EntryMayBeMovedTo — check if entry can move to new outer data ****/
-    EntryMayBeMovedTo(Entry: SDS_Entry, OuterItem: SDS_Item, InsertionIndex?: number): boolean;
+    newLinkAt(Target: SDS_Item, outerItem: SDS_Item, InsertionIndex?: number): SDS_Link;
+    /**** deserializeItemInto — import item subtree; always remaps all IDs ****/
+    deserializeItemInto(Serialisation: unknown, outerItem: SDS_Item, InsertionIndex?: number): SDS_Item;
+    /**** deserializeLinkInto — import link; always assigns a new Id ****/
+    deserializeLinkInto(Serialisation: unknown, outerItem: SDS_Item, InsertionIndex?: number): SDS_Link;
     /**** moveEntryTo — move entry to new outer data and position ****/
-    moveEntryTo(Entry: SDS_Entry, OuterItem: SDS_Item, InsertionIndex?: number): void;
-    /**** EntryMayBeDeleted — check if entry can be deleted ****/
-    EntryMayBeDeleted(Entry: SDS_Entry): boolean;
+    moveEntryTo(Entry: SDS_Entry, outerItem: SDS_Item, InsertionIndex?: number): void;
+    /**** _rebalanceInnerEntriesOf — backend-specific raw rebalance; caller must hold a transaction ****/
+    _rebalanceInnerEntriesOf(outerItemId: string): void;
     /**** deleteEntry — move entry to trash with timestamp ****/
     deleteEntry(Entry: SDS_Entry): void;
     /**** purgeEntry — permanently delete entry and subtree ****/
@@ -76,8 +78,10 @@ export declare class SDS_DataStore {
     recoverOrphans(): void;
     /**** asBinary — export compressed Y.js update ****/
     asBinary(): Uint8Array;
-    /**** asJSON — export as base64-encoded compressed update ****/
-    asJSON(): string;
+    /**** newEntryFromBinaryAt — import a gzip-compressed entry (item or link) ****/
+    newEntryFromBinaryAt(Serialisation: Uint8Array, outerItem: SDS_Item, InsertionIndex?: number): SDS_Entry;
+    /**** _EntryAsBinary — gzip-compress the JSON representation of an entry ****/
+    _EntryAsBinary(Id: string): Uint8Array;
     /**** _KindOf — get entry kind ****/
     _KindOf(Id: string): 'item' | 'link';
     /**** _LabelOf — get entry label text ****/
@@ -90,26 +94,21 @@ export declare class SDS_DataStore {
     _setTypeOf(Id: string, Value: string): void;
     /**** _ValueKindOf — get data value kind ****/
     _ValueKindOf(Id: string): 'none' | 'literal' | 'binary' | 'binary-reference' | 'literal-reference' | 'pending';
-    /**** _isLiteralOf — check if data has literal value ****/
-    _isLiteralOf(Id: string): boolean;
-    /**** _isBinaryOf — check if data has binary value ****/
-    _isBinaryOf(Id: string): boolean;
     /**** _readValueOf — get data value (literal or binary) ****/
     _readValueOf(Id: string): Promise<string | Uint8Array | undefined>;
     /**** _writeValueOf — set data value ****/
     _writeValueOf(Id: string, Value: string | Uint8Array | undefined): void;
     /**** _spliceValueOf — modify literal value range ****/
     _spliceValueOf(Id: string, fromIndex: number, toIndex: number, Replacement: string): void;
+    /**** _getValueRefOf — return the ValueRef for *-reference entries ****/
+    _getValueRefOf(Id: string): {
+        Hash: string;
+        Size: number;
+    } | undefined;
     /**** _InfoProxyOf — get info metadata proxy object ****/
     _InfoProxyOf(Id: string): Record<string, unknown>;
-    /**** _outerItemOf — get outer data ****/
-    _outerItemOf(Id: string): SDS_Item | undefined;
-    /**** _outerItemIdOf — get outer data ID ****/
+    /**** _outerItemIdOf — get outer item Id ****/
     _outerItemIdOf(Id: string): string | undefined;
-    /**** _outerItemChainOf — get ancestor chain ****/
-    _outerItemChainOf(Id: string): SDS_Item[];
-    /**** _outerItemIdsOf — get ancestor IDs ****/
-    _outerItemIdsOf(Id: string): string[];
     /**** _innerEntriesOf — get sorted children as array-like proxy ****/
     _innerEntriesOf(DataId: string): SDS_Entry[];
     /**** _mayMoveEntryTo — check move validity ****/
@@ -118,15 +117,11 @@ export declare class SDS_DataStore {
     _mayDeleteEntry(Id: string): boolean;
     /**** _TargetOf — get link target data ****/
     _TargetOf(Id: string): SDS_Item;
-    /**** _EntryAsJSON — serialize entry and subtree ****/
-    _EntryAsJSON(Id: string): unknown;
+    /**** _currentValueOf — synchronously return the inline value of an item ****/
+    _currentValueOf(Id: string): string | Uint8Array | undefined;
 }
 
-export declare interface SDS_DataStoreOptions {
-    LiteralSizeLimit?: number;
-    TrashTTLms?: number;
-    TrashCheckIntervalMs?: number;
-}
+export { SDS_DataStoreOptions }
 
 export { SDS_Entry }
 

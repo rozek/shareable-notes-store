@@ -92,6 +92,10 @@ export class SDS_SyncEngine {
   // unsubscribe functions for registered handlers
   #Unsubs: Array<() => void> = []
 
+  // tracks entryId → blob hash for all entries whose value is in a *-reference kind;
+  // used to call releaseValue() when the entry's value changes or the entry is purged
+  #TrackedBlobRefs: Map<string,string> = new Map()
+
 //----------------------------------------------------------------------------//
 //                                Constructor                                 //
 //----------------------------------------------------------------------------//
@@ -121,6 +125,12 @@ export class SDS_SyncEngine {
 /**** start ****/
 
   async start ():Promise<void> {
+    // wire lazy persistence loading so _readValueOf can fetch blobs on demand
+    if (this.#Persistence != undefined) {
+      this.#Store.setValueBlobLoader(
+        (Hash) => this.#Persistence!.loadValue(Hash)
+      )
+    }
     await this.#loadAndRestore()
     this.#wireStoreToProviders()
     this.#wireNetworkToStore()
@@ -223,7 +233,7 @@ export class SDS_SyncEngine {
     this.#Presence?.sendLocalState(State)
     this.#BC?.postMessage({ type:'presence', payload:State })
     for (const Handler of this.#PresenceChangeHandlers) {
-      try { Handler(this.PeerId, full, 'local') } catch {}
+      try { Handler(this.PeerId, full, 'local') } catch (Signal) { console.error('SDS: presence handler failed', Signal) }
     }
   }
 
@@ -285,7 +295,11 @@ export class SDS_SyncEngine {
 
   #wireStoreToProviders ():void {
     const unsub = this.#Store.onChangeInvoke((Origin, ChangeSet) => {
-      if (Origin !== 'internal') { return }
+      if (Origin === 'external') {
+        // incoming remote patch: request any blobs we don't have yet
+        this.#handleValueChanges(ChangeSet, 'request').catch(() => {})
+        return
+      }
 
       // export exactly the patch produced by this local change.
       // #LastCursor was captured just before this change fired, so
@@ -316,7 +330,7 @@ export class SDS_SyncEngine {
       }
 
       // detect value changes and transfer blobs
-      this.#handleValueChanges(ChangeSet).catch(() => {})
+      this.#handleValueChanges(ChangeSet, 'send').catch(() => {})
     })
     this.#Unsubs.push(unsub)
   }
@@ -331,6 +345,7 @@ export class SDS_SyncEngine {
       this.#Unsubs.push(unsubPatch)
 
       const unsubValue = this.#Network.onValue(async (Hash, Data) => {
+        this.#Store.storeValueBlob(Hash, Data)       // cache in DataStore for immediate readValue()
         await this.#Persistence?.saveValue(Hash, Data)
       })
       this.#Unsubs.push(unsubValue)
@@ -365,10 +380,13 @@ export class SDS_SyncEngine {
     if (this.#BC == undefined) { return }
     this.#BC.onmessage = (BroadcastEvent) => {
       const Msg = BroadcastEvent.data as { type:string; payload:any }
-      if (Msg.type === 'patch') {
-        try { this.#Store.applyRemotePatch(Msg.payload as Uint8Array) } catch {}
-      } else if (Msg.type === 'presence') {
-        this.#Presence?.sendLocalState(Msg.payload as SDS_LocalPresenceState)
+      switch (true) {
+        case (Msg.type === 'patch'):
+          try { this.#Store.applyRemotePatch(Msg.payload as Uint8Array) } catch (Signal) { console.error('SDS: failed to apply remote patch from BroadcastChannel', Signal) }
+          break
+        case (Msg.type === 'presence'):
+          this.#Presence?.sendLocalState(Msg.payload as SDS_LocalPresenceState)
+          break
       }
     }
   }
@@ -396,7 +414,7 @@ export class SDS_SyncEngine {
   #flushOfflineQueue ():void {
     const Queue = this.#OfflineQueue.splice(0)
     for (const PatchData of Queue) {
-      try { this.#Network?.sendPatch(PatchData) } catch {}
+      try { this.#Network?.sendPatch(PatchData) } catch (Signal) { console.error('SDS: failed to send queued patch', Signal) }
     }
   }
 
@@ -404,17 +422,64 @@ export class SDS_SyncEngine {
 //                               Value Transfer                               //
 //----------------------------------------------------------------------------//
 
-/**** #handleValueChanges — stub: detects value-ref changes and triggers blob transfer ****/
+/**** #handleValueChanges — send outgoing blobs, request missing incoming blobs, release stale blobs ****/
 
-  async #handleValueChanges (ChangeSet:SDS_ChangeSet):Promise<void> {
-    for (const [_EntryId, Changes] of Object.entries(ChangeSet)) {
-      if ((Changes as Set<string>).has('Value') && this.#Network != undefined) {
-        // value refs are requested / sent by the SyncEngine when the CRDT
-        // ValueKind becomes 'binary-reference' or 'literal-reference'.
-        // Full implementation requires reading ValueRef from the entry and
-        // triggering sendValue / requestValue accordingly.
-        // This stub satisfies the interface; full implementation is left for
-        // the ValueStore integration layer.
+  async #handleValueChanges (
+    ChangeSet:SDS_ChangeSet,
+    Direction:'send' | 'request',
+  ):Promise<void> {
+    for (const [EntryId, Changes] of Object.entries(ChangeSet)) {
+      const changedProps = Changes as Set<string>
+
+      // ── entry purged — release its blob if we are tracking one ───────────
+      if (changedProps.has('Existence')) {
+        const oldHash = this.#TrackedBlobRefs.get(EntryId)
+        if (oldHash != undefined) {
+          await this.#Persistence?.releaseValue(oldHash)
+          this.#TrackedBlobRefs.delete(EntryId)
+        }
+      }
+
+      if (! changedProps.has('Value')) { continue }
+
+      // ── value changed — release old blob if the hash has changed ─────────
+      const oldHash = this.#TrackedBlobRefs.get(EntryId)
+      const ref     = this.#Store._getValueRefOf(EntryId)
+      const newHash = ref?.Hash
+
+      if (oldHash != undefined && oldHash !== newHash) {
+        await this.#Persistence?.releaseValue(oldHash)
+        this.#TrackedBlobRefs.delete(EntryId)
+      }
+
+      if (ref == undefined) { continue }  // value is inline or cleared; nothing to transfer
+
+      // ── blob transfer / request ───────────────────────────────────────────
+      if (this.#Network == undefined) {
+        // no network — still track the ref so we can release it later
+        this.#TrackedBlobRefs.set(EntryId, ref.Hash)
+        continue
+      }
+
+      if (Direction === 'send') {
+        // outgoing: persist blob locally, then forward to connected peers
+        const Blob = this.#Store.getValueBlobByHash(ref.Hash)
+        if (Blob != undefined) {
+          await this.#Persistence?.saveValue(ref.Hash, Blob)
+          this.#TrackedBlobRefs.set(EntryId, ref.Hash)
+          if (this.#Network.ConnectionState === 'connected') {
+            this.#Network.sendValue(ref.Hash, Blob)
+          }
+        }
+      } else {
+        // incoming: track the ref; request blob from the network if not cached
+        this.#TrackedBlobRefs.set(EntryId, ref.Hash)
+        if (
+          ! this.#Store.hasValueBlob(ref.Hash) &&
+          this.#Network.ConnectionState === 'connected'
+        ) {
+          this.#Network.requestValue(ref.Hash)
+        }
       }
     }
   }
@@ -438,7 +503,7 @@ export class SDS_SyncEngine {
     this.#resetPeerTimeout(PeerId)
 
     for (const Handler of this.#PresenceChangeHandlers) {
-      try { Handler(PeerId, State, 'remote') } catch {}
+      try { Handler(PeerId, State, 'remote') } catch (Signal) { console.error('SDS: presence handler failed', Signal) }
     }
   }
 
@@ -462,7 +527,7 @@ export class SDS_SyncEngine {
     const Timer = this.#PeerTimeoutTimers.get(PeerId)
     if (Timer != undefined) { clearTimeout(Timer); this.#PeerTimeoutTimers.delete(PeerId) }
     for (const Handler of this.#PresenceChangeHandlers) {
-      try { Handler(PeerId, undefined, 'remote') } catch {}
+      try { Handler(PeerId, undefined, 'remote') } catch (Signal) { console.error('SDS: presence handler failed', Signal) }
     }
   }
 }

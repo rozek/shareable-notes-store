@@ -347,7 +347,10 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 
 #### 2.1 Round-trip fidelity
 
-- **TC-10.2.1** — `fromJSON(store.asJSON())` produces a store structurally equivalent to the original
+- **TC-10.2.1** — `fromJSON(store.asJSON())` produces a store structurally equivalent to the original, preserving all entry IDs
+- **TC-10.2.2** — `asJSON()` returns a plain JavaScript object (not a string); its `Kind` property equals `'item'`
+- **TC-10.2.3** — A stored literal string value is recovered intact after a `fromJSON(asJSON())` round-trip
+- **TC-10.2.4** — A stored binary value is recovered intact after a `fromJSON(asJSON())` round-trip
 
 ### 3. Nested structure
 
@@ -431,6 +434,7 @@ Backend-specific initialisation details (e.g. canonical empty snapshots) are tes
 - **TC-13.1.3** — The imported data has the same `Label` as the serialised source
 - **TC-13.1.4** — The imported data has the same MIME type as the serialised source
 - **TC-13.1.5** — Nested inner items are imported and their nesting relationships are preserved
+- **TC-13.1.6** — The imported item preserves the literal string value from the serialised source
 
 ### 2. Link deserialisation
 

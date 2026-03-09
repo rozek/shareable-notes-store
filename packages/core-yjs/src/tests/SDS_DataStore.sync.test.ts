@@ -28,7 +28,7 @@ describe('SDS_DataStore — Sync', () => {
     const Binary   = Store1.asBinary()
     const Store2   = SDS_DataStore.fromBinary(Binary)
 
-    const Item = Store1.newItemAt(Store1.RootItem)
+    const Item = Store1.newItemAt(undefined, Store1.RootItem)
     Item.Label     = 'synced data'
 
     const Patch    = Store1.exportPatch()
@@ -42,9 +42,9 @@ describe('SDS_DataStore — Sync', () => {
     const Binary   = Store1.asBinary()
     const Store2   = SDS_DataStore.fromBinary(Binary)
 
-    const Item1    = Store1.newItemAt(Store1.RootItem)
+    const Item1    = Store1.newItemAt(undefined, Store1.RootItem)
     Item1.Label    = 'from store 1'
-    const Item2    = Store2.newItemAt(Store2.RootItem)
+    const Item2    = Store2.newItemAt(undefined, Store2.RootItem)
     Item2.Label    = 'from store 2'
 
     Store2.applyRemotePatch(Store1.exportPatch())
@@ -65,8 +65,8 @@ describe('SDS_DataStore — Sync', () => {
     const StoreA    = SDS_DataStore.fromScratch()
     const StoreB    = SDS_DataStore.fromBinary(StoreA.asBinary())
 
-    const OuterItem = StoreA.newItemAt(StoreA.RootItem)
-    const Item = StoreA.newItemAt(OuterItem)
+    const OuterItem = StoreA.newItemAt(undefined, StoreA.RootItem)
+    const Item = StoreA.newItemAt(undefined, OuterItem)
     StoreA.moveEntryTo(Item, StoreA.RootItem)
 
     StoreB.applyRemotePatch(StoreA.exportPatch())
@@ -86,7 +86,7 @@ describe('SDS_DataStore — Sync', () => {
     const StoreA = SDS_DataStore.fromScratch()
     const StoreB = SDS_DataStore.fromBinary(StoreA.asBinary())
 
-    const Item = StoreA.newItemAt(StoreA.RootItem)
+    const Item = StoreA.newItemAt(undefined, StoreA.RootItem)
     StoreA.deleteEntry(Item)
     StoreA.purgeEntry(Item)
 
@@ -102,10 +102,10 @@ describe('SDS_DataStore — Sync', () => {
     const StoreB     = SDS_DataStore.fromBinary(StoreA.asBinary())
 
     // Bystander exists on StoreB before the remote patch arrives.
-    const Bystander  = StoreB.newItemAt(StoreB.RootItem)
+    const Bystander  = StoreB.newItemAt(undefined, StoreB.RootItem)
 
     // StoreA creates a new data (not yet known to StoreB).
-    const RemoteItem = StoreA.newItemAt(StoreA.RootItem)
+    const RemoteItem = StoreA.newItemAt(undefined, StoreA.RootItem)
 
     let ReceivedChangeSet:SDS_ChangeSet | undefined
     StoreB.onChangeInvoke((_Origin, ChangeSet) => { ReceivedChangeSet = ChangeSet })
@@ -127,7 +127,7 @@ describe('SDS_DataStore — Sync', () => {
   it('EV-10: Origin is external after applyRemotePatch', () => {
     const Store1   = SDS_DataStore.fromScratch()
     const Store2   = SDS_DataStore.fromBinary(Store1.asBinary())
-    Store1.newItemAt(Store1.RootItem)
+    Store1.newItemAt(undefined, Store1.RootItem)
     const Patch    = Store1.exportPatch()
     const Handler  = vi.fn()
     Store2.onChangeInvoke(Handler)

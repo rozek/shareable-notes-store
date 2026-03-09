@@ -143,10 +143,12 @@ export class LiveStore {
   handleChunk (Frame:Uint8Array):void {
     if (Frame.byteLength < 1+HASH_SIZE+8) { return }
 
+    const MAX_BLOB_SIZE = 2*1024*1024*1024  // 2 GB
+
     const HashBytes = Frame.slice(1, 1+HASH_SIZE)
     const HashHex   = BytesToHex(HashBytes)
     const View      = new DataView(Frame.buffer, Frame.byteOffset+1+HASH_SIZE)
-    const Idx       = View.getUint32(0, false)
+    const Index     = View.getUint32(0, false)
     const Total     = View.getUint32(4, false)
     const Chunk     = Frame.slice(1+HASH_SIZE+8)
     let   Buffer    = this.#ChunkBuffers.get(HashHex)
@@ -154,7 +156,7 @@ export class LiveStore {
       Buffer = { Chunks:new Map(), Total }
       this.#ChunkBuffers.set(HashHex, Buffer)
     }
-    Buffer.Chunks.set(Idx, Chunk)
+    Buffer.Chunks.set(Index, Chunk)
     if (Buffer.Chunks.size < Buffer.Total) { return }
     this.#ChunkBuffers.delete(HashHex)
     const Parts:Uint8Array[] = []
@@ -163,6 +165,10 @@ export class LiveStore {
       if (Part != null) { Parts.push(Part) }
     }
     const DataSize = Parts.reduce((Sum, P) => Sum+P.byteLength, 0)
+    if (DataSize > MAX_BLOB_SIZE) {
+      console.warn(`SDS: blob ${HashHex} rejected — size ${DataSize} exceeds limit of ${MAX_BLOB_SIZE} bytes`)
+      return
+    }
     const Payload  = new Uint8Array(HASH_SIZE+DataSize)
       Payload.set(HashBytes, 0)
     let Offset = HASH_SIZE
@@ -297,6 +303,9 @@ export function createSDSServer (Options?:Partial<SDS_ServerOptions>) {
   if (JWTSecretStr.length === 0) {
     throw new Error('SDS_JWT_SECRET environment variable is required')
   }
+  if (JWTSecretStr.length < 32) {
+    throw new Error('SDS_JWT_SECRET must be at least 32 characters long for HS256')
+  }
   const Secret = new TextEncoder().encode(JWTSecretStr)
 
   const App = new Hono()
@@ -405,11 +414,15 @@ export function createSDSServer (Options?:Partial<SDS_ServerOptions>) {
       },
       onMessage: (_Event, _WS) => {
         const Data = _Event.data
-        if (Data instanceof ArrayBuffer) {
-          SignalStore.broadcast(new Uint8Array(Data), Client)
-        } else if (typeof Data === 'string') {
-          const Bytes = new TextEncoder().encode(Data)
-          SignalStore.broadcast(Bytes, Client)
+        switch (true) {
+          case (Data instanceof ArrayBuffer):
+            SignalStore.broadcast(new Uint8Array(Data), Client)
+            break
+          case (typeof Data === 'string'): {
+            const Bytes = new TextEncoder().encode(Data)
+            SignalStore.broadcast(Bytes, Client)
+            break
+          }
         }
       },
       onClose: () => {

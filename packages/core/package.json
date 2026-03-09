@@ -39,6 +39,9 @@
     "test:run": "vitest run",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "zod": "^3.22.0"
+  },
   "devDependencies": {
     "typescript": "^5.7.2",
     "vite": "^6.0.0",
