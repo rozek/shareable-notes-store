@@ -409,7 +409,7 @@ const NetworkProvider = new SDS_WebSocketProvider({
 })
 
 const SyncEngine = new SDS_SyncEngine(Store, { NetworkProvider })
-await SyncEngine()
+await SyncEngine.start()
 ```
 
 ---
