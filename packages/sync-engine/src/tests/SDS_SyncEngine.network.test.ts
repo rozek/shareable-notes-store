@@ -42,7 +42,7 @@ describe('SDS_SyncEngine — Network', () => {
     const Store  = SDS_DataStore.fromScratch()
     const Engine = new SDS_SyncEngine(Store)
     await Engine.start()
-    await expect(Engine.connectTo('wss://x', { Token:'t' })).rejects.toThrow(expect.objectContaining({ Code:'no-network-provider' }))
+    await expect(Engine.connectTo('wss://x', { Token:'t' })).rejects.toThrow(expect.objectContaining({ code:'no-network-provider' }))
     await Engine.stop()
   })
 
@@ -51,7 +51,7 @@ describe('SDS_SyncEngine — Network', () => {
     const Network = makeMockNetwork()
     const Engine  = new SDS_SyncEngine(Store, { NetworkProvider:Network as any })
     await Engine.start()
-    await expect(Engine.reconnect()).rejects.toThrow(expect.objectContaining({ Code:'not-yet-connected' }))
+    await expect(Engine.reconnect()).rejects.toThrow(expect.objectContaining({ code:'not-yet-connected' }))
     await Engine.stop()
   })
 
@@ -61,7 +61,7 @@ describe('SDS_SyncEngine — Network', () => {
     const Engine  = new SDS_SyncEngine(Store, { NetworkProvider:Network as any })
     await Engine.start()
     Network._triggerConn('connected')
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     await Engine.stop()
     expect(Network.sendPatch).toHaveBeenCalled()
   })
@@ -73,7 +73,7 @@ describe('SDS_SyncEngine — Network', () => {
     await Engine.start()
 
     // remain disconnected — create a data (patch should be queued, not sent)
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     expect(Network.sendPatch).not.toHaveBeenCalled()
 
     // now simulate reconnect — queued patch should be flushed
@@ -86,7 +86,7 @@ describe('SDS_SyncEngine — Network', () => {
   it('SN-05: incoming network patch triggers store.applyRemotePatch', async () => {
     const Store1  = SDS_DataStore.fromScratch()
     const Store2  = SDS_DataStore.fromBinary(Store1.asBinary())
-    const Item = Store1.newItemAt(Store1.RootItem)
+    const Item = Store1.newItemAt(undefined, Store1.RootItem)
     Item.Label    = 'synced'
     const Patch   = Store1.exportPatch()
 

@@ -89,7 +89,7 @@ describe('SDS_SyncEngine — Lifecycle', () => {
     })
     await Engine.start()
     // Force a change to accumulate bytes
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
     await Engine.stop()
     // saveSnapshot should have been called either during accumulation or at stop
     // (depends on threshold; just verify no exception)
