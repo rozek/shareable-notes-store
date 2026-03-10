@@ -353,23 +353,23 @@ An admin token is required to issue further tokens via `POST /api/token`. Create
 
 ```bash
 SDS_JWT_SECRET=$(grep SDS_JWT_SECRET /opt/sds-websocket-server/.env | cut -d= -f2) \
+  SDS_ISSUER=$(grep    SDS_ISSUER     /opt/sds-websocket-server/.env | cut -d= -f2) \
   STORE_ID=my-store-42 \
   SUBJECT=admin@example.com \
   node /opt/sds-websocket-server/generate-admin-token.mjs
 ```
 
-The script reads `SDS_JWT_SECRET`, `STORE_ID`, `SUBJECT`, and optionally `EXPIRES_IN` (default: `90d`) from the environment and prints the signed JWT to stdout.
+The script reads `SDS_JWT_SECRET`, `STORE_ID`, `SUBJECT`, and optionally `SDS_ISSUER` and `EXPIRES_IN` (default: `90d`) from the environment and prints the signed JWT to stdout. **`SDS_ISSUER` must be passed if it is set on the server** — otherwise the server will reject the token with `invalid token`.
 
 ---
 
 ## Issue Client Tokens via the API
 
-With the admin token you can issue further tokens at runtime, e.g. for individual users:
+With the admin token you can issue further tokens at runtime, e.g. for individual users. The issued token automatically inherits the store ID (`aud` claim) from the admin token — there is no separate `aud` field in the request body. An admin token is always store-scoped, so it can only issue tokens for its own store. To issue tokens for a different store, use a separate admin token for that store.
 
 ```bash
 ADMIN_TOKEN="<admin-token-from-above>"
 SDS_DOMAIN="store.example.com"
-STORE_ID="my-store-42"
 
 curl -s -X POST "https://${SDS_DOMAIN}/api/token" \
   -H "Authorization: Bearer ${ADMIN_TOKEN}" \

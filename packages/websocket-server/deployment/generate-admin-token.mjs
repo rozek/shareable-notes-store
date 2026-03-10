@@ -7,10 +7,12 @@
 //   SUBJECT         — e.g. 'admin@example.com'
 //
 // Optional:
+//   SDS_ISSUER      — must match SDS_ISSUER on the server if that variable is set
 //   EXPIRES_IN      — e.g. '90d', '24h', '30m' (default: '90d')
 //
 // Example:
 //   SDS_JWT_SECRET=$(grep SDS_JWT_SECRET /opt/sds-websocket-server/.env | cut -d= -f2) \
+//     SDS_ISSUER=$(grep SDS_ISSUER     /opt/sds-websocket-server/.env | cut -d= -f2) \
 //     STORE_ID=my-store-42 \
 //     SUBJECT=admin@example.com \
 //     node generate-admin-token.mjs
@@ -34,6 +36,7 @@ function parseExpiry (str) {
 const Secret    = process.env.SDS_JWT_SECRET
 const StoreId   = process.env.STORE_ID
 const Subject   = process.env.SUBJECT
+const Issuer    = process.env.SDS_ISSUER || undefined
 const ExpiresIn = process.env.EXPIRES_IN ?? '90d'
 
 if (!Secret || !StoreId || !Subject) {
@@ -44,8 +47,11 @@ if (!Secret || !StoreId || !Subject) {
 const now = Math.floor(Date.now() / 1000)
 const exp = now + parseExpiry(ExpiresIn)
 
+const claims = { sub:Subject, aud:StoreId, scope:'admin', iat:now, exp,
+  ...(Issuer != null ? { iss:Issuer } : {}) }
+
 const header  = base64url({ alg:'HS256', typ:'JWT' })
-const payload = base64url({ sub:Subject, aud:StoreId, scope:'admin', iat:now, exp })
+const payload = base64url(claims)
 
 const signature = createHmac('sha256', Buffer.from(Secret, 'utf8'))
   .update(`${header}.${payload}`)

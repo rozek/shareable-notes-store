@@ -163,7 +163,6 @@ Content-Type: application/json
 
 {
   "sub":   "alice",
-  "aud":   "my-items",
   "scope": "write",
   "exp":   "1h"
 }
@@ -172,9 +171,10 @@ Content-Type: application/json
 | Field | Required | Description |
 | --- | --- | --- |
 | `sub` | yes | subject (user identifier) |
-| `aud` | yes | audience (store Id) |
 | `scope` | yes | `'read'`, `'write'`, or `'admin'` |
 | `exp` | no | expiry in [zeit/ms](https://github.com/vercel/ms) format, e.g. `'1h'`, `'7d'` |
+
+The issued token automatically inherits the store ID (`aud` claim) from the admin token — there is no `aud` field in the request body. An admin token is store-scoped, so it can only issue tokens for its own store.
 
 **Response (200):**
 
