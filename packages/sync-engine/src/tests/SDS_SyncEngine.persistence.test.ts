@@ -36,7 +36,7 @@ describe('SDS_SyncEngine — Persistence', () => {
     // from the same CRDT model base (patches only apply across compatible models).
     const SourceStore   = SDS_DataStore.fromScratch()
     const InitialBinary = SourceStore.asBinary()
-    const Item = SourceStore.newItemAt(SourceStore.RootItem)
+    const Item = SourceStore.newItemAt(undefined, SourceStore.RootItem)
     Item.Label          = 'persisted-data'
     const Patch         = SourceStore.exportPatch()
     expect(Patch.byteLength).toBeGreaterThan(0)
@@ -63,7 +63,7 @@ describe('SDS_SyncEngine — Persistence', () => {
     const Engine = new SDS_SyncEngine(Store, { PersistenceProvider:Persist })
     await Engine.start()
 
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
 
     // give async ops a tick to settle
     await new Promise((r) => setTimeout(r, 10))
@@ -90,7 +90,7 @@ describe('SDS_SyncEngine — Persistence', () => {
     // the 512 KiB (524,288 byte) threshold. With 150,000 chars per patch and
     // 4 iterations, accumulated bytes ≈ 600 KB > 512 KiB.
     const BigLabel = 'L'.repeat(150_000)
-    const Item = Store.newItemAt(Store.RootItem)
+    const Item = Store.newItemAt(undefined, Store.RootItem)
     for (let i = 0; i < 4; i++) {
       Item.Label = BigLabel + i
     }
@@ -113,7 +113,7 @@ describe('SDS_SyncEngine — Persistence', () => {
     await Engine.start()
 
     // trigger a small change — not enough for in-flight threshold
-    Store.newItemAt(Store.RootItem)
+    Store.newItemAt(undefined, Store.RootItem)
 
     await new Promise((r) => setTimeout(r, 10))
 
