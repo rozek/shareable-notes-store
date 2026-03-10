@@ -190,6 +190,7 @@ export declare interface SDS_DataStoreOptions {
     LiteralSizeLimit?: number;
     TrashTTLms?: number;
     TrashCheckIntervalMs?: number;
+    onApplyPatchError?: (Error: unknown) => void;
 }
 
 export declare class SDS_Entry {
