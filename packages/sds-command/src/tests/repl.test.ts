@@ -129,5 +129,19 @@ describe('REPL (RP)', () => {
     expect(Result.Stdout).toMatch(/store:/)   // store info succeeded after help
     // "shell" must not appear in the REPL's help output
     expect(Result.Stdout).not.toMatch(/\bshell\b/)
+    // the help subcommand must not produce any error output
+    expect(Result.Stderr).not.toMatch(/error/)
+  })
+
+  it('RP-10: "help <subcommand>" inside the REPL shows subcommand help without error', async () => {
+    // "help entry" must display entry-command help and must not emit any error
+    const Result = await runCLI(
+      ['--store', 'test', '--data-dir', DataDir, 'shell'],
+      {},
+      'help entry\nexit\n',
+    )
+    expect(Result.ExitCode).toBe(0)
+    expect(Result.Stdout).toMatch(/entry/)    // help output mentions 'entry'
+    expect(Result.Stderr).not.toMatch(/error/)
   })
 })

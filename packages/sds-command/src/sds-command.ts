@@ -89,6 +89,11 @@ function buildProgram (ExtraArgv:string[], isSubContext:boolean = false):Command
         }
       })
 
+    // Commander suppresses the built-in `help [command]` subcommand when a
+    // root action is registered; force it back so that `sds help entry` etc.
+    // work correctly from the top-level CLI
+    Program.addHelpCommand(true)
+
   }
 
   return Program
@@ -156,7 +161,10 @@ async function executeTokens (
     const CommanderError = Signal as { code?:string; message:string; exitCode?:number }
 
     // commander's own exit events — not real errors
+    // note: --help/-h throws 'commander.helpDisplayed'; the `help` subcommand
+    // throws 'commander.help' — both must be treated as success
     if (
+      (CommanderError.code === 'commander.help') ||
       (CommanderError.code === 'commander.helpDisplayed') ||
       (CommanderError.code === 'commander.version')
     ) { return ExitCodes.OK }
@@ -217,6 +225,7 @@ async function main ():Promise<void> {
     const CommanderError = Signal as { code?:string; message:string; exitCode?:number }
 
     if (
+      (CommanderError.code === 'commander.help') ||
       (CommanderError.code === 'commander.helpDisplayed') ||
       (CommanderError.code === 'commander.version')
     ) { process.exit(ExitCodes.OK) }

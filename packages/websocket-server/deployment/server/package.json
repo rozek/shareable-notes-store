@@ -6,7 +6,8 @@
     "start": "node server.mjs"
   },
   "dependencies": {
-    "@rozek/sds-websocket-server": "file:sds-websocket-server.tgz",
+    "@rozek/sds-websocket-server":  "file:sds-websocket-server.tgz",
+    "@rozek/sds-persistence-node":  "file:sds-persistence-node.tgz",
     "@hono/node-server": "^1.0.0",
     "@hono/node-ws": "^1.0.0",
     "hono": "^4.0.0",

@@ -258,6 +258,7 @@ Verify that the `sds` CLI tool correctly resolves configuration, tokenises input
 - **TC-26.3** — `--format` with an unrecognised value exits with `UsageError` (code 2); error message mentions `--format`
 - **TC-26.4** — `--on-error` with an unrecognised value exits with `UsageError` (code 2); error message mentions `--on-error`
 - **TC-26.5** — `sds --version` exits with code 0 and prints a semver version string to stdout
+- **TC-26.6** — `sds help entry` exits with code 0, shows entry-specific usage (contains `sds entry` and `create`), and produces no error on stderr
 
 ### 4. Usage error output order
 
@@ -273,7 +274,8 @@ Verify that the `sds` CLI tool correctly resolves configuration, tokenises input
 - **TC-24.4** — Global options given at `sds shell` start (e.g. `--store`, `--data-dir`) are inherited by every command in the session
 - **TC-24.5** — A failing command prints an error but does not end the session; subsequent commands succeed normally
 - **TC-24.6** — An unknown command prints an error but does not end the session
-- **TC-24.7** — `help` inside the REPL shows available commands and does not end the session; `shell` does not appear in the help output
+- **TC-24.7** — `help` inside the REPL shows available commands and does not end the session; `shell` does not appear in the help output; no error is written to stderr
+- **TC-24.9** — `help entry` inside the REPL shows entry subcommand help and does not end the session; no error is written to stderr
 - **TC-24.8** — A failing command in the REPL sends its error to stderr (not stdout); stdout is unaffected
 
 ### 3. Script runner — `--on-error` modes

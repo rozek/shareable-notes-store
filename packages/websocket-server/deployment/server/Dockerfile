@@ -3,13 +3,10 @@ FROM node:22-alpine
 
 WORKDIR /app
 
-# build tools required to compile better-sqlite3 (native addon)
-RUN apk add --no-cache python3 make g++
-
 # install dependencies first so Docker can cache this layer
-# sds-websocket-server.tgz is built locally and copied here before docker compose build
-# (see DEPLOYMENT.md — Quick Start)
-COPY package.json sds-websocket-server.tgz ./
+# sds-websocket-server.tgz and sds-persistence-node.tgz are built locally
+# and copied here before docker compose build (see DEPLOYMENT.md — Quick Start)
+COPY package.json sds-websocket-server.tgz sds-persistence-node.tgz ./
 RUN npm install --omit=dev
 
 # entry point

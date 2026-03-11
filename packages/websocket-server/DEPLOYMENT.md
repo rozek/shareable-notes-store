@@ -112,14 +112,20 @@ cd /opt/sds-websocket-server
 cp .env.example .env
 $EDITOR .env          # set SDS_JWT_SECRET, SDS_DOMAIN, ACME_EMAIL
 
-# 4. build the package tarball
+# 4. build the package tarballs
 #    (corepack is included in Node.js 22 and activates pnpm automatically)
 cd /opt/shareable-data-store
 corepack enable
 pnpm install
-pnpm --filter @rozek/sds-websocket-server build
-pnpm --filter @rozek/sds-websocket-server pack --pack-destination /tmp/sds-pack/
+pnpm --filter @rozek/sds-websocket-server... build
+cd packages/websocket-server
+pnpm pack --pack-destination /tmp/sds-pack/
+cd -
+cd packages/persistence-node
+pnpm pack --pack-destination /tmp/sds-pack/
+cd -
 mv /tmp/sds-pack/rozek-sds-websocket-server-*.tgz /opt/sds-websocket-server/server/sds-websocket-server.tgz
+mv /tmp/sds-pack/rozek-sds-persistence-node-*.tgz /opt/sds-websocket-server/server/sds-persistence-node.tgz
 
 # 5. build the Docker image (uses docker-compose.build.yml to add the build: section)
 cd /opt/sds-websocket-server
@@ -142,11 +148,15 @@ git pull
 cp -r packages/websocket-server/deployment/server /opt/sds-websocket-server/server
 
 pnpm install
-pnpm --filter @rozek/sds-websocket-server build
+pnpm --filter @rozek/sds-websocket-server... build
 cd packages/websocket-server
 pnpm pack --pack-destination /tmp/sds-pack/
 cd -
+cd packages/persistence-node
+pnpm pack --pack-destination /tmp/sds-pack/
+cd -
 mv /tmp/sds-pack/rozek-sds-websocket-server-*.tgz /opt/sds-websocket-server/server/sds-websocket-server.tgz
+mv /tmp/sds-pack/rozek-sds-persistence-node-*.tgz /opt/sds-websocket-server/server/sds-persistence-node.tgz
 
 cd /opt/sds-websocket-server
 docker compose -f docker-compose.yml -f docker-compose.build.yml build
@@ -242,11 +252,15 @@ Build on a development machine or in CI (where RAM is plentiful), ship only the 
 **On your dev machine / in CI:**
 
 ```bash
-pnpm --filter @rozek/sds-websocket-server build
+pnpm --filter @rozek/sds-websocket-server... build
 cd packages/websocket-server
 pnpm pack --pack-destination /tmp/sds-pack/
 cd -
+cd packages/persistence-node
+pnpm pack --pack-destination /tmp/sds-pack/
+cd -
 scp /tmp/sds-pack/rozek-sds-websocket-server-*.tgz user@server:/opt/sds-websocket-server/
+scp /tmp/sds-pack/rozek-sds-persistence-node-*.tgz user@server:/opt/sds-websocket-server/
 ```
 
 **On the server:**
@@ -296,7 +310,8 @@ node server.mjs
     ├── Dockerfile
     ├── package.json
     ├── server.mjs              ← entry point
-    └── sds-websocket-server.tgz  ← only for Setup A2 (built locally)
+    ├── sds-websocket-server.tgz    ← only for Setup A2 (built locally)
+    └── sds-persistence-node.tgz    ← only for Setup A2 (built locally)
 
 Docker named volumes (managed by Docker, independent of /opt/sds-websocket-server/):
   caddy_data    ← TLS certificates

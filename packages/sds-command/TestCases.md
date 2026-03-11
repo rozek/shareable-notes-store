@@ -180,6 +180,7 @@
 | CL-03 | `--format` with invalid value (e.g. `xml`) | exits with `UsageError` (code 2); error mentions `--format` |
 | CL-04 | `--on-error` with invalid value (e.g. `foobar`) | exits with `UsageError` (code 2); error mentions `--on-error` |
 | CL-05 | `sds --version` | exits with code 0; stdout matches semver pattern `\d+\.\d+\.\d+` |
+| CL-06 | `sds help entry` | exits with code 0; stdout contains `sds entry` and `create`; no error on stderr |
 
 ## UE — Usage Error Output Order
 
@@ -215,7 +216,8 @@
 | RP-05 | global options on `sds shell` start | available in every subsequent command (no "no store ID" error) |
 | RP-06 | failing command in REPL | error printed; session continues; next command succeeds |
 | RP-07 | unknown command in REPL | error printed; session continues; next command succeeds |
-| RP-08 | `help` in REPL | available commands shown; session continues; `shell` not listed |
+| RP-08 | `help` in REPL | available commands shown; session continues; `shell` not listed; no error on stderr |
+| RP-10 | `help entry` in REPL | entry subcommand help shown; session continues; no error on stderr |
 | RP-09 | failing command in REPL | error message goes to stderr (not stdout); stdout unaffected |
 
 ## DO — Duplicate Options

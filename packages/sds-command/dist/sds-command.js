@@ -8,7 +8,7 @@ import { SDS_DesktopPersistenceProvider as V } from "@rozek/sds-persistence-node
 import { SDS_SyncEngine as B } from "@rozek/sds-sync-engine";
 import { SDS_WebSocketProvider as O } from "@rozek/sds-network-websocket";
 import { TrashId as N, RootId as E, LostAndFoundId as ee } from "@rozek/sds-core";
-import P from "node:readline";
+import C from "node:readline";
 const c = {
   OK: 0,
   // success
@@ -261,7 +261,7 @@ function k(e, o) {
     );
   return n;
 }
-async function C(e) {
+async function P(e) {
   try {
     return await g.readFile(e);
   } catch (o) {
@@ -377,7 +377,7 @@ function H(e) {
   return n.length > 0 && o.push(n), o;
 }
 async function ie(e) {
-  const o = process.stdin.isTTY, n = o ? "\x1B[1msds>\x1B[0m " : "sds> ", t = P.createInterface({
+  const o = process.stdin.isTTY, n = o ? "\x1B[1msds>\x1B[0m " : "sds> ", t = C.createInterface({
     input: process.stdin,
     output: process.stdout,
     terminal: o,
@@ -423,7 +423,7 @@ async function ae(e, o, n) {
         c.NotFound
       );
     }
-  const r = P.createInterface({
+  const r = C.createInterface({
     input: t,
     terminal: !1
   });
@@ -460,13 +460,13 @@ async function ae(e, o, n) {
 }
 async function ce() {
   return process.stdin.isTTY ? new Promise((o) => {
-    const n = P.createInterface({ input: process.stdin, output: process.stdout });
+    const n = C.createInterface({ input: process.stdin, output: process.stdout });
     n.question("error — continue? [y/N] ", (t) => {
       n.close(), o(t.trim().toLowerCase() === "y");
     });
   }) : !1;
 }
-const le = "0.0.7", de = {
+const le = "0.0.8", de = {
   version: le
 };
 function ue(e) {
@@ -649,7 +649,7 @@ async function ge(e, o, n) {
   }
 }
 async function Ee(e, o) {
-  const n = await C(o), t = n.toString("utf8").trimStart(), r = t.startsWith("{") || t.startsWith("["), s = await y(e, !0);
+  const n = await P(o), t = n.toString("utf8").trimStart(), r = t.startsWith("{") || t.startsWith("["), s = await y(e, !0);
   try {
     if (r) {
       let i;
@@ -786,7 +786,7 @@ async function be(e, o, n) {
       const a = o.mime ?? "text/plain", d = t.Store.newItemAt(a, s, i);
       switch (o.label != null && (d.Label = o.label), !0) {
         case o.file != null: {
-          const u = await C(o.file), h = !a.startsWith("text/");
+          const u = await P(o.file), h = !a.startsWith("text/");
           d.writeValue(h ? new Uint8Array(u) : u.toString("utf8"));
           break;
         }
@@ -991,7 +991,7 @@ async function Ue(e, o, n, t) {
       const a = i;
       switch (n.mime != null && (a.Type = n.mime), !0) {
         case n.file != null: {
-          const d = await C(n.file), u = !a.Type.startsWith("text/");
+          const d = await P(n.file), u = !a.Type.startsWith("text/");
           a.writeValue(u ? new Uint8Array(d) : d.toString("utf8"));
           break;
         }
@@ -1068,7 +1068,7 @@ function je(e) {
     await We(r, n.only);
   }), o.command("purge-all").description("permanently delete every entry in the trash").action(async (n, t) => {
     const r = m(t.optsWithGlobals());
-    await Pe(r);
+    await Ce(r);
   }), o.command("purge-expired").description("permanently delete trash entries older than --ttl milliseconds").option("--ttl <ms>", "TTL in milliseconds (default: 30 days)", String(Re)).action(async (n, t) => {
     const r = m(t.optsWithGlobals()), s = k(n.ttl, "--ttl");
     if (s <= 0)
@@ -1076,7 +1076,7 @@ function je(e) {
         `'--ttl' must be a positive integer — got ${s}`,
         c.UsageError
       );
-    await Ce(r, s);
+    await Pe(r, s);
   });
 }
 async function We(e, o) {
@@ -1111,7 +1111,7 @@ async function We(e, o) {
     await p(t);
   }
 }
-async function Pe(e) {
+async function Ce(e) {
   const o = await y(e);
   try {
     const n = o.Store.TrashItem, t = [...o.Store._innerEntriesOf(n.Id)];
@@ -1126,7 +1126,7 @@ async function Pe(e) {
     await p(o);
   }
 }
-async function Ce(e, o) {
+async function Pe(e, o) {
   const n = await y(e);
   try {
     const t = n.Store.purgeExpiredTrashEntries(o);
@@ -1188,7 +1188,7 @@ function Z(e, o = !1) {
       process.exit(s);
     } else
       process.stdout.write(n.helpInformation()), process.exit(c.OK);
-  })), n;
+  }), n.addHelpCommand(!0)), n;
 }
 function A(e) {
   e.exitOverride(), e.configureOutput({ writeErr: () => {
@@ -1216,7 +1216,7 @@ async function J(e, o) {
     return await s.parseAsync(["node", "sds", ...r, ...n]), c.OK;
   } catch (i) {
     const a = i;
-    return a.code === "commander.helpDisplayed" || a.code === "commander.version" ? c.OK : a.code === "commander.unknownCommand" ? (process.stderr.write(`sds: unknown command '${n[0]}' — try 'sds help'
+    return a.code === "commander.help" || a.code === "commander.helpDisplayed" || a.code === "commander.version" ? c.OK : a.code === "commander.unknownCommand" ? (process.stderr.write(`sds: unknown command '${n[0]}' — try 'sds help'
 `), c.UsageError) : a.code === "commander.unknownOption" || a.code === "commander.missingArgument" || a.code === "commander.missingMandatoryOptionValue" ? (process.stderr.write(`sds: ${a.message}
 `), c.UsageError) : i instanceof U ? (process.stderr.write(`sds: ${i.message}
 `), i.ExitCode) : i instanceof l ? (L(o ?? { Format: "text" }, i.message, i.ExitCode), i.ExitCode) : (L(o ?? { Format: "text" }, i.message ?? String(i)), c.GeneralError);
@@ -1232,7 +1232,7 @@ async function Je() {
     await t.parseAsync(["node", "sds", ...e]);
   } catch (r) {
     const s = r;
-    if ((s.code === "commander.helpDisplayed" || s.code === "commander.version") && process.exit(c.OK), (s.code === "commander.unknownCommand" || s.code === "commander.unknownOption" || s.code === "commander.missingArgument" || s.code === "commander.missingMandatoryOptionValue") && (process.stderr.write(`sds: ${s.message}
+    if ((s.code === "commander.help" || s.code === "commander.helpDisplayed" || s.code === "commander.version") && process.exit(c.OK), (s.code === "commander.unknownCommand" || s.code === "commander.unknownOption" || s.code === "commander.missingArgument" || s.code === "commander.missingMandatoryOptionValue") && (process.stderr.write(`sds: ${s.message}
 
 `), process.stderr.write(t.helpInformation()), process.exit(c.UsageError)), r instanceof U && (process.stderr.write(`sds: ${r.message}
 `), process.exit(r.ExitCode)), r instanceof l) {
