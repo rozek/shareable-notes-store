@@ -91,7 +91,7 @@ Both positional arguments may also be supplied through environment variables or 
 | `SDS_STORE_ID` | store identifier (overridden by positional `<store-id>`) |
 | `SDS_TOKEN` | JWT for the WebSocket server |
 | `SDS_WEBHOOK_TOKEN` | Bearer token for all outgoing webhook HTTP calls |
-| `SDS_PERSISTENCE_DIR` | birectory for the local SQLite database |
+| `SDS_PERSISTENCE_DIR` | directory for the local SQLite database |
 | `SDS_ON_AUTH_ERROR` | Webhook URL to notify when the server rejects the token |
 
 ---
