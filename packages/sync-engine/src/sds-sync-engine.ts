@@ -424,11 +424,27 @@ export class SDS_SyncEngine {
 //                                 Checkpoint                                 //
 //----------------------------------------------------------------------------//
 
-/**** #writeCheckpoint — saves a snapshot and prunes patches (network engines only) ****/
+/**** #writeCheckpoint — merges external patches, saves snapshot, prunes (network engines only) ****/
 
   async #writeCheckpoint ():Promise<void> {
     if (this.#Persistence == undefined) { return }
-    await this.#Persistence.saveSnapshot(this.#Store.asBinary())
+
+    // merge any patches written by other processes (e.g. CLI while a sidecar
+    // is running) so the snapshot always reflects the latest known state.
+    // without this, a long-lived process could overwrite a newer snapshot
+    // produced by a short-lived CLI invocation with its own stale state.
+    const ExternalPatches = await this.#Persistence.loadPatchesSince(this.#PatchSeq)
+    for (const PatchBytes of ExternalPatches) {
+      try { this.#Store.applyRemotePatch(PatchBytes) } catch (_Signal) {}
+    }
+    if (ExternalPatches.length > 0) {
+      this.#PatchSeq += ExternalPatches.length
+      // advance the cursor so the next local exportPatch() does not re-export
+      // the external patches we just merged
+      this.#LastCursor = this.#Store.currentCursor
+    }
+
+    await this.#Persistence.saveSnapshot(this.#Store.asBinary(), this.#PatchSeq)
     // only prune residual patches if this engine has a NetworkProvider —
     // offline-only engines keep patches in SQLite so that a future
     // 'store sync' run can upload them to the server

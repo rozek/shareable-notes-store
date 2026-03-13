@@ -85,13 +85,13 @@ export class SDS_DesktopPersistenceProvider implements SDS_PersistenceProvider {
 
 /**** saveSnapshot ****/
 
-  async saveSnapshot (Data:Uint8Array):Promise<void> {
+  async saveSnapshot (Data:Uint8Array, Clock?:SDS_PatchSeqNumber):Promise<void> {
     this.#DB
       .prepare(
         'INSERT INTO snapshots (store_id, data, clock) VALUES (?,?,?) ' +
         'ON CONFLICT(store_id) DO UPDATE SET data=excluded.data, clock=excluded.clock'
       )
-      .run(this.#StoreId, Data, Date.now())
+      .run(this.#StoreId, Data, Clock ?? 0)
   }
 
 /**** loadPatchesSince ****/

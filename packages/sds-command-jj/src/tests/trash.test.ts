@@ -16,7 +16,7 @@ import { runCLI } from './runCLI.js'
 //                       TR — trash list / purge-all / purge-expired         //
 //----------------------------------------------------------------------------//
 
-describe('trash commands (TR)', () => {
+describe('trash commands (TR)', { timeout:30000 }, () => {
   let PersistenceDir:string
 
   beforeAll(async () => {
@@ -126,5 +126,57 @@ describe('trash commands (TR)', () => {
     ])
     expect(Result.ExitCode).toBe(2)
     expect(Result.Stderr).toMatch(/--ttl/i)
+  })
+
+  it('TR-09: purge-all persists across sessions — many entries', async () => {
+    // separate persistence dir for isolation
+    const Dir = await fs.mkdtemp(path.join(os.tmpdir(), 'sds-tr09-'))
+    try {
+      // session A: create 5 items
+      const Ids:string[] = []
+      for (let i = 0; i < 5; i++) {
+        const C = await runCLI([
+          '--store', 'tr09', '--persistence-dir', Dir,
+          'entry', 'create', '--label', `item-${i}`,
+        ])
+        expect(C.ExitCode).toBe(0)
+        Ids.push(C.Stdout.trim())
+      }
+
+      // session B: trash all 5
+      for (const Id of Ids) {
+        const D = await runCLI([
+          '--store', 'tr09', '--persistence-dir', Dir, 'entry', 'delete', Id,
+        ])
+        expect(D.ExitCode).toBe(0)
+      }
+
+      // session C: purge-all
+      const Purge = await runCLI([
+        '--store', 'tr09', '--persistence-dir', Dir,
+        '--format', 'json', 'trash', 'purge-all',
+      ])
+      expect(Purge.ExitCode).toBe(0)
+      expect(JSON.parse(Purge.Stdout).purged).toBe(5)
+
+      // session D: verify trash is empty
+      const TrashList = await runCLI([
+        '--store', 'tr09', '--persistence-dir', Dir,
+        '--format', 'json', 'trash', 'list',
+      ])
+      expect(TrashList.ExitCode).toBe(0)
+      expect(JSON.parse(TrashList.Stdout)).toEqual([])
+
+      // session E: verify tree only contains system containers
+      const Tree = await runCLI([
+        '--store', 'tr09', '--persistence-dir', Dir,
+        '--format', 'json', 'tree', 'show',
+      ])
+      expect(Tree.ExitCode).toBe(0)
+      const Root = JSON.parse(Tree.Stdout).root as Array<{ id:string }>
+      expect(Root.length).toBe(2) // only Trash and LostAndFound
+    } finally {
+      await fs.rm(Dir, { recursive:true, force:true })
+    }
   })
 })

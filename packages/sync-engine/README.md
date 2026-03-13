@@ -47,6 +47,14 @@ When a data's value changes to a reference kind (`'literal-reference'` or `'bina
 
 The engine periodically re-broadcasts the local presence state so that remote peers can detect stale entries (timeout controlled by `PresenceTimeoutMs`).
 
+### Concurrent process access
+
+Multiple processes may share the same SQLite database file — for example, a long-lived `sds-sidecar` daemon running alongside short-lived `sds` CLI invocations. SQLite's WAL mode ensures that concurrent reads and writes do not corrupt the database.
+
+The sync engine handles this transparently: before writing a checkpoint snapshot, `writeCheckpoint` calls `loadPatchesSince(#PatchSeq)` to discover and merge any patches that other processes have appended since the last checkpoint. The saved snapshot therefore always reflects the combined state of all processes, and no mutations are silently lost.
+
+Offline engines (no `NetworkProvider`) never prune patches, so a subsequent `store sync` can still upload them to the server. Network engines prune patches after each checkpoint because the server already has the data.
+
 ### BroadcastChannel (Browser / Tauri)
 
 When running in a browser or Tauri context, the engine optionally uses a `BroadcastChannel` to relay patches and presence frames between tabs opened on the same origin, without going through the server.
@@ -111,7 +119,7 @@ All providers are optional. You can use any combination — for example persiste
 
 | Code | Thrown by | Reason |
 | --- | --- | --- |
-| `'no-network-provider'` | `connectTo()` | No `NetworkProvider` was configured |
+| `'no-network-provider'` | `connectTo()` | no `NetworkProvider` was configured |
 | `'not-yet-connected'` | `reconnect()` | `connectTo()` has never been called successfully |
 
 ---

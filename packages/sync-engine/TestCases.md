@@ -19,6 +19,8 @@
 | SP-04 | stop() writes checkpoint for offline engine; patches are NOT pruned (must survive for future sync) | saveSnapshot() called; prunePatches() NOT called; close() called |
 | SP-05 | stop() writes checkpoint even when only remote patches were received (AccumulatedBytes stays 0); network engine prunes | saveSnapshot() + prunePatches() + close() called; snapshot contains remote item |
 | SP-06 | network engines prune patches on checkpoint; offline engines preserve patches for future sync | offline: prunePatches() not called; network: prunePatches() called |
+| SP-07 | writeCheckpoint merges external patches before saving snapshot (concurrent access) | snapshot saved by stop() contains data from patches written by another process |
+| SP-08 | writeCheckpoint advances LastCursor after merging external patches | subsequent local exportPatch() does not re-export the merged external data |
 
 ## SN — Network
 

@@ -187,6 +187,12 @@ Backend-specific additions are documented in each backend's own `TestCases.md`.
 | D-20 | `dispose()` stops the auto-purge timer | spy called once before dispose; still called only once after 2 s more |
 | D-21 | auto-purge timer calls `purgeExpiredTrashEntries` when `TrashTTLms` is configured | entry expired 90 s ago is absent after one check interval |
 | D-22 | moving an entry out of TrashItem removes `Info._trashedAt` | `data.Info['_trashedAt'] === undefined` after `moveEntryTo(data, RootItem)` |
+| D-23 | `purgeEntry` survives a snapshot+patch-replay round-trip | post-purge snapshot + all patches replayed → Trash empty, entries absent |
+| D-24 | `purgeEntry` survives replay of only pre-purge patches on post-purge snapshot | old creation patches do not resurrect purged entries |
+| D-25 | purge survives per-patch replay (simulates individual `appendPatch` round-trip) | per-patch replay on post-purge snapshot → Trash empty, LostAndFound empty |
+| D-26 | purge survives per-patch replay of only pre-purge patches on post-purge snapshot | no resurrection, no LostAndFound orphans |
+| D-27 | purge patches applied to a stale (pre-purge) snapshot delete entries | simulates concurrent access: pre-purge snapshot + all patches → Trash empty |
+| D-28 | purge patches applied to stale snapshot — purge patches only (no creation patches) | simulates sidecar prune: only purge patches survive → entries correctly deleted |
 
 ---
 

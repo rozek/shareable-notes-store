@@ -125,7 +125,7 @@ Both positional arguments may also be supplied through environment variables or 
 
 | Option | Description |
 | --- | --- |
-| `--on-auth-error <url>` | Webhook URL to notify when the server rejects the token (uses `--webhook-token` too) |
+| `--on-auth-error <url>` | webhook URL to notify when the server rejects the token (uses `--webhook-token` too) |
 
 #### Reconnect tuning
 
@@ -217,6 +217,10 @@ Every matching webhook receives an HTTP POST with a JSON body. Each request time
 `Topic` is only present when `--topic` (or `"Topic"` in the config file) is set. The `Authorization: Bearer <token>` header is included when a webhook token is set.
 
 ---
+
+### Concurrent access with CLI commands
+
+The sidecar and the `sds` CLI tool can safely operate on the same store at the same time. Both share the same SQLite database (WAL mode), and the sync engine automatically merges patches written by other processes before saving a checkpoint snapshot. This means that CLI operations like `trash purge-all` or `entry create` are never silently overwritten by the sidecar's own checkpoint.
 
 ### Reconnect Behaviour
 

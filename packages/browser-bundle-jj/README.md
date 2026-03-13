@@ -245,8 +245,8 @@ The output is written to `packages/browser-bundle-jj/dist/`:
 
 | file | description |
 | --- | --- |
-| `sds-browser-bundle-jj.js` | Single ESM file (≈ 439 KB raw, ≈ 100 KB gzip) |
-| `sds-browser-bundle-jj.d.ts` | Rolled-up TypeScript declarations |
+| `sds-browser-bundle-jj.js` | single ESM file (≈ 439 KB raw, ≈ 100 KB gzip) |
+| `sds-browser-bundle-jj.d.ts` | rolled-up TypeScript declarations |
 
 ---
 

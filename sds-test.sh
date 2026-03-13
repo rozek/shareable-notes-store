@@ -7,33 +7,54 @@
 # large values, and --file).
 #
 # Usage:
-#   bash sds-test.sh [<store-id> [<npm-package>]]
+#   bash sds-test.sh [<store-id> [<npm-package> [<persistence-dir> [<server-url> [<token>]]]]]
+#
+# The last three arguments can also be supplied via environment variables:
+#   SDS_PERSISTENCE_DIR   local directory for SQLite files (default: ~/.sds)
+#   SDS_SERVER_URL        WebSocket server URL  — enables store ping + sync
+#   SDS_TOKEN             client JWT            — required when SDS_SERVER_URL is set
 #
 # Examples:
-#   bash sds-test.sh                                  # store: sds-test,  pkg: @rozek/sds-command-jj
-#   bash sds-test.sh my-store                         # store: my-store,  pkg: @rozek/sds-command-jj
-#   bash sds-test.sh my-store @rozek/sds-command-yjs  # store: my-store,  pkg: sds-command-yjs
+#   bash sds-test.sh
+#   bash sds-test.sh my-store @rozek/sds-command-yjs /tmp/sds-data
+#   SDS_SERVER_URL=ws://localhost:8080 SDS_TOKEN=eyJ... bash sds-test.sh
 
 set -euo pipefail
 
 STORE="${1:-sds-test}"
 PKG="${2:-@rozek/sds-command-jj}"
+PERSISTENCE_DIR="${3:-${SDS_PERSISTENCE_DIR:-}}"
+SERVER_URL="${4:-${SDS_SERVER_URL:-}}"
+TOKEN="${5:-${SDS_TOKEN:-}}"
+
+if [[ -n "$SERVER_URL" && -z "$TOKEN" ]]; then
+  echo "Error: a server URL was given but no token — set SDS_TOKEN or pass it as 5th argument" >&2
+  exit 2
+fi
 
 #───────────────────────────────────────────────────────────────────────────────
 # helpers
 #───────────────────────────────────────────────────────────────────────────────
 
-# extract "id" from sds JSON output — no external tools needed
-json_id() { printf '%s' "$1" | grep -o '"id":"[^"]*"' | sed 's/"id":"//;s/"//g'; }
+# extract "id" from pretty-printed sds JSON output (JSON.stringify uses 2-space
+# indent and a space after ":", e.g.  "id": "abc-123").
+# sed always exits 0 (unlike grep), so set -o pipefail never fires here.
+json_id() { printf '%s' "$1" | sed -n 's/.*"id": *"\([^"]*\)".*/\1/p'; }
+
+# build the global option array shared by every sds invocation
+GLOBAL_OPTS=(--store "$STORE")
+[[ -n "$PERSISTENCE_DIR" ]] && GLOBAL_OPTS+=(--persistence-dir "$PERSISTENCE_DIR")
+[[ -n "$SERVER_URL" ]]       && GLOBAL_OPTS+=(--server "$SERVER_URL")
+[[ -n "$TOKEN" ]]            && GLOBAL_OPTS+=(--token  "$TOKEN")
 
 # run a command with visible echo
 run() {
-  echo "  \$ npx $PKG --store $STORE $*"
-  npx "$PKG" --store "$STORE" "$@"
+  echo "  \$ npx $PKG ${GLOBAL_OPTS[*]} $*"
+  npx "$PKG" "${GLOBAL_OPTS[@]}" "$@"
 }
 
 # run with --format json, return raw output (used when capturing IDs)
-runj() { npx "$PKG" --store "$STORE" --format json "$@"; }
+runj() { npx "$PKG" "${GLOBAL_OPTS[@]}" --format json "$@"; }
 
 section() {
   echo ""
@@ -51,6 +72,26 @@ ok() { echo "  ✓ $*"; }
 section "1. store info (initial)"
 run store info
 ok "store info"
+
+#───────────────────────────────────────────────────────────────────────────────
+# 1b. network: ping + sync  (only when --server / SDS_SERVER_URL is set)
+#───────────────────────────────────────────────────────────────────────────────
+
+if [[ -n "$SERVER_URL" ]]; then
+  section "1b. store ping + sync"
+
+  echo "  — ping server:"
+  run store ping
+  ok "store ping"
+
+  echo "  — sync (pull remote state before local writes):"
+  run store sync
+  ok "store sync"
+
+  echo "  — sync with explicit timeout:"
+  run store sync --timeout 10000
+  ok "store sync --timeout"
+fi
 
 #───────────────────────────────────────────────────────────────────────────────
 # 2. create the "sds-test" container item at root
@@ -261,7 +302,7 @@ run entry list root --label
 ok "entry list root"
 
 echo "  — entry list with --format json:"
-run --format json entry list "$TEST_ID" --label --kind
+run --format json entry list "$TEST_ID" --label --mime
 ok "entry list (--format json)"
 
 #───────────────────────────────────────────────────────────────────────────────
@@ -446,6 +487,16 @@ ok "store import (binary)"
 rm -f "$EXPORT_JSON" "$EXPORT_BIN"
 
 #───────────────────────────────────────────────────────────────────────────────
+# 14b. sync after writes  (only when --server / SDS_SERVER_URL is set)
+#───────────────────────────────────────────────────────────────────────────────
+
+if [[ -n "$SERVER_URL" ]]; then
+  section "14b. store sync (push local changes)"
+  run store sync
+  ok "store sync (after writes)"
+fi
+
+#───────────────────────────────────────────────────────────────────────────────
 # 15. final state
 #───────────────────────────────────────────────────────────────────────────────
 
@@ -459,8 +510,8 @@ ok "final store info + tree"
 #───────────────────────────────────────────────────────────────────────────────
 
 section "16. Cleanup"
-run store destroy
-ok "store destroy"
+# run store destroy
+# ok "store destroy"
 
 echo ""
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"

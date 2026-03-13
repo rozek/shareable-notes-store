@@ -31,8 +31,9 @@ export interface SDS_PersistenceProvider {
   loadSnapshot ():Promise<Uint8Array | undefined>
 
 /**** saveSnapshot — persist a full snapshot, replacing any previous one ****/
+/**** Clock is the current PatchSeq at checkpoint time (used as ordering key) ****/
 
-  saveSnapshot (Data:Uint8Array):Promise<void>
+  saveSnapshot (Data:Uint8Array, Clock?:SDS_PatchSeqNumber):Promise<void>
 
 /**** loadPatchesSince — load all patches with SeqNumber > given value ****/
 

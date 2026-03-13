@@ -8,7 +8,7 @@ export declare class SDS_DesktopPersistenceProvider implements SDS_PersistencePr
     /**** loadSnapshot ****/
     loadSnapshot(): Promise<Uint8Array | undefined>;
     /**** saveSnapshot ****/
-    saveSnapshot(Data: Uint8Array): Promise<void>;
+    saveSnapshot(Data: Uint8Array, Clock?: SDS_PatchSeqNumber): Promise<void>;
     /**** loadPatchesSince ****/
     loadPatchesSince(SeqNumber: SDS_PatchSeqNumber): Promise<Uint8Array[]>;
     /**** appendPatch ****/

@@ -174,6 +174,7 @@ All tests spawn the built `dist/sds-command-jj.js` binary. Exit codes and stdout
 | TR-06 | `--ttl` with non-integer | exits with `UsageError` (code 2) |
 | TR-07 | `trash list --only` with invalid value | exits with `UsageError` (code 2); error mentions `--only` |
 | TR-08 | `trash purge-expired --ttl -1` | exits with `UsageError` (code 2); error mentions `--ttl` |
+| TR-09 | `purge-all` persists across sessions — many entries | 5 items created, trashed, purge-all'd across separate sessions; re-opened store shows empty Trash |
 
 ## TW — Tree Show
 

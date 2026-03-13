@@ -270,7 +270,7 @@ The output is written to `packages/browser-bundle-loro/dist/`:
 | file | description |
 | --- | --- |
 | `sds-browser-bundle-loro.js` | ESM file (≈ 163 KB raw, ≈ 36 KB gzip); `loro-crdt` external |
-| `sds-browser-bundle-loro.d.ts` | Rolled-up TypeScript declarations |
+| `sds-browser-bundle-loro.d.ts` | rolled-up TypeScript declarations |
 
 ---
 

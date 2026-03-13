@@ -32,9 +32,9 @@ The provider creates one IndexedDB database per store (named `sds:<storeId>`) wi
 
 | Object store | Key | Contents |
 |---|---|---|
-| `snapshots` | `storeId` | Latest gzip-compressed full-store snapshot |
-| `patches` | `[storeId, clock]` | Incremental CRDT patches in clock order |
-| `values` | `hash` | Large value blobs with SHA-256 hash key and reference counter |
+| `snapshots` | `storeId` | latest gzip-compressed full-store snapshot |
+| `patches` | `[storeId, clock]` | incremental CRDT patches in clock order |
+| `values` | `hash` | large value blobs with SHA-256 hash key and reference counter |
 
 The database is opened lazily on the first operation. All operations are wrapped in IndexedDB transactions and return promises.
 

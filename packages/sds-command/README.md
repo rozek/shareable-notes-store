@@ -59,13 +59,13 @@ Every command shares the same set of global options and environment variable ove
 | option | env var | description |
 | --- | --- | --- |
 | `--server <url>` | `SDS_SERVER_URL` | WebSocket server base URL |
-| `--store <id>` | `SDS_STORE_ID` | Store identifier (= local SQLite file basename) |
-| `--token <jwt>` | `SDS_TOKEN` | Client JWT with `read` or `write` scope |
-| `--admin-token <jwt>` | `SDS_ADMIN_TOKEN` | Admin JWT with `admin` scope |
-| `--persistence-dir <path>` | `SDS_PERSISTENCE_DIR` | Directory for local SQLite files (default: `~/.sds`) |
-| `--format <fmt>` | — | Output format: `text` (default) or `json`; any other value exits with code 2 |
-| `--on-error <action>` | — | Error handling in script/batch mode: `stop` (default), `continue`, or `ask`; ignored in the interactive REPL (which always continues on error); any other value exits with code 2 |
-| `--version` | — | Print the installed `sds` version number and exit with code 0 |
+| `--store <id>` | `SDS_STORE_ID` | store identifier (= local SQLite file basename) |
+| `--token <jwt>` | `SDS_TOKEN` | client JWT with `read` or `write` scope |
+| `--admin-token <jwt>` | `SDS_ADMIN_TOKEN` | admin JWT with `admin` scope |
+| `--persistence-dir <path>` | `SDS_PERSISTENCE_DIR` | directory for local SQLite files (default: `~/.sds`) |
+| `--format <fmt>` | — | output format: `text` (default) or `json`; any other value exits with code 2 |
+| `--on-error <action>` | — | error handling in script/batch mode: `stop` (default), `continue`, or `ask`; ignored in the interactive REPL (which always continues on error); any other value exits with code 2 |
+| `--version` | — | print the installed `sds` version number and exit with code 0 |
 
 ---
 
@@ -230,6 +230,12 @@ Several commands support dynamically named info options where `<key>` is the nam
 **In write commands** (`entry create`, `entry update`): `--info-delete.<key>` (no value argument) removes a single info entry from the stored info map. For example, `--info-delete.author` removes the `author` key. Multiple `--info-delete.<key>` flags can be combined with `--info` and `--info.<key>` flags in the same command — all changes are applied together. On `entry create` the flag is accepted but has no effect (there are no existing keys to remove). The same key-naming rules apply: `<key>` must be a valid JavaScript identifier.
 
 **Conflict rule — delete wins**: If the same key is specified by both `--info.<key>` (or `--info <json>`) and `--info-delete.<key>` in the same command, the delete takes precedence and the key will be absent after the command. The write is applied first and the delete second, regardless of the order the flags appear on the command line.
+
+---
+
+## Concurrent access with sds-sidecar
+
+The `sds` CLI and the `sds-sidecar` daemon can safely operate on the same store at the same time. Both share the same SQLite database (WAL mode), and the sync engine automatically merges patches written by other processes before writing a checkpoint snapshot. CLI mutations — such as `trash purge-all`, `entry create`, or `entry update` — are never silently lost, even while the sidecar is running.
 
 ---
 

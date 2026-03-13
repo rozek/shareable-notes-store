@@ -35,10 +35,10 @@ class c {
     return this.#s.prepare("SELECT data FROM snapshots WHERE store_id = ?").get(this.#a)?.data;
   }
   /**** saveSnapshot ****/
-  async saveSnapshot(s) {
+  async saveSnapshot(s, a) {
     this.#s.prepare(
       "INSERT INTO snapshots (store_id, data, clock) VALUES (?,?,?) ON CONFLICT(store_id) DO UPDATE SET data=excluded.data, clock=excluded.clock"
-    ).run(this.#a, s, Date.now());
+    ).run(this.#a, s, a ?? 0);
   }
   /**** loadPatchesSince ****/
   async loadPatchesSince(s) {

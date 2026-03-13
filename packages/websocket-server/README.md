@@ -119,8 +119,8 @@ wss://my-server.example.com/ws/my-store?token=<jwt>
 
 | condition | behaviour |
 | --- | --- |
-| Missing, malformed, expired, or otherwise invalid token | WebSocket upgrade is accepted; connection is immediately closed with code **4001** (`Unauthorized`) |
-| Valid token but `aud` does not match `:StoreId` | WebSocket upgrade is accepted; connection is immediately closed with code **4003** (`Forbidden`) |
+| missing, malformed, expired, or otherwise invalid token | WebSocket upgrade is accepted; connection is immediately closed with code **4001** (`Unauthorized`) |
+| valid token but `aud` does not match `:StoreId` | WebSocket upgrade is accepted; connection is immediately closed with code **4003** (`Forbidden`) |
 
 The upgrade is always accepted before the close is sent because Hono's WebSocket adapter requires an `onOpen` handler to issue the close frame — the HTTP-level handshake completes first in every case.
 

@@ -245,8 +245,8 @@ The output is written to `packages/browser-bundle-yjs/dist/`:
 
 | file | description |
 | --- | --- |
-| `sds-browser-bundle-yjs.js` | Single ESM file (≈ 332 KB raw, ≈ 74 KB gzip) |
-| `sds-browser-bundle-yjs.d.ts` | Rolled-up TypeScript declarations |
+| `sds-browser-bundle-yjs.js` | single ESM file (≈ 332 KB raw, ≈ 74 KB gzip) |
+| `sds-browser-bundle-yjs.d.ts` | rolled-up TypeScript declarations |
 
 ---
 

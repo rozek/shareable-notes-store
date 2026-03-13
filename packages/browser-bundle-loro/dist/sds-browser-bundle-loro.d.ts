@@ -10,7 +10,7 @@ export declare class SDS_BrowserPersistenceProvider implements SDS_PersistencePr
     /**** loadSnapshot ****/
     loadSnapshot(): Promise<Uint8Array | undefined>;
     /**** saveSnapshot ****/
-    saveSnapshot(Data: Uint8Array): Promise<void>;
+    saveSnapshot(Data: Uint8Array, Clock?: SDS_PatchSeqNumber): Promise<void>;
     /**** loadPatchesSince ****/
     loadPatchesSince(SeqNumber: SDS_PatchSeqNumber): Promise<Uint8Array[]>;
     /**** appendPatch ****/
@@ -415,7 +415,8 @@ export declare interface SDS_PersistenceProvider {
     /**** loadSnapshot — load most recent full snapshot, or undefined if none exists ****/
     loadSnapshot(): Promise<Uint8Array | undefined>;
     /**** saveSnapshot — persist a full snapshot, replacing any previous one ****/
-    saveSnapshot(Data: Uint8Array): Promise<void>;
+    /**** Clock is the current PatchSeq at checkpoint time (used as ordering key) ****/
+    saveSnapshot(Data: Uint8Array, Clock?: SDS_PatchSeqNumber): Promise<void>;
     /**** loadPatchesSince — load all patches with SeqNumber > given value ****/
     loadPatchesSince(SeqNumber: SDS_PatchSeqNumber): Promise<Uint8Array[]>;
     /**** appendPatch — append a patch at the given sequence position ****/

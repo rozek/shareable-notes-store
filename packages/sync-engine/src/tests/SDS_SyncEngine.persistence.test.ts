@@ -193,6 +193,98 @@ describe('SDS_SyncEngine — Persistence', () => {
     expect(RestoredStore.EntryWithId(Item.Id)?.Label).toBe('remote-item')
   })
 
+  it('SP-07: writeCheckpoint merges external patches before saving snapshot', async () => {
+    // simulates the concurrent-access scenario: a short-lived CLI process
+    // writes purge patches to the DB while a long-lived sidecar is running.
+    // when the sidecar's writeCheckpoint fires, it must merge the CLI patches
+    // so the snapshot includes the purge — otherwise the stale snapshot
+    // would overwrite the CLI's fresher state.
+
+    // build a patch from a separate store (simulates the CLI's purge patch)
+    const SourceStore   = SDS_DataStore.fromScratch()
+    const InitialBinary = SourceStore.asBinary()
+    const Item          = SourceStore.newItemAt(undefined, SourceStore.RootItem)
+    Item.Label          = 'created-by-cli'
+    const ExternalPatch = SourceStore.exportPatch()
+
+    // target store starts from the same base (simulates the sidecar's state)
+    const TargetStore = SDS_DataStore.fromBinary(InitialBinary)
+
+    // the first loadPatchesSince (during start) returns nothing
+    // the second call (during writeCheckpoint on stop) returns the external patch
+    const loadPatchesSinceFn = vi.fn()
+      .mockResolvedValueOnce([])           // #loadAndRestore: no initial patches
+      .mockResolvedValueOnce([ExternalPatch]) // #writeCheckpoint: CLI patch appeared
+    const Persist = {
+      ...makeMockPersistence(),
+      loadPatchesSince: loadPatchesSinceFn,
+    }
+
+    const Engine = new SDS_SyncEngine(TargetStore, { PersistenceProvider:Persist })
+    await Engine.start()
+
+    // no local changes — the sidecar just idles
+    await Engine.stop()
+
+    // writeCheckpoint must have saved a snapshot
+    expect(Persist.saveSnapshot).toHaveBeenCalled()
+
+    // the snapshot must contain the external patch's data
+    const SnapshotArg = Persist.saveSnapshot.mock.calls[0][0] as Uint8Array
+    const RestoredStore = SDS_DataStore.fromBinary(SnapshotArg)
+    expect(RestoredStore.EntryWithId(Item.Id)?.Label).toBe('created-by-cli')
+  })
+
+  it('SP-08: writeCheckpoint advances LastCursor after merging external patches', async () => {
+    // after merging external patches, the next local exportPatch must NOT
+    // re-export the external operations (would cause duplicate patches in DB)
+    const SourceStore   = SDS_DataStore.fromScratch()
+    const InitialBinary = SourceStore.asBinary()
+    const SourceItem    = SourceStore.newItemAt(undefined, SourceStore.RootItem)
+    SourceItem.Label    = 'external-item'
+    const ExternalPatch = SourceStore.exportPatch()
+
+    const TargetStore = SDS_DataStore.fromBinary(InitialBinary)
+
+    // loadPatchesSince: first call (start) → nothing; second call (threshold checkpoint) → external patch
+    let CallCount = 0
+    const loadPatchesSinceFn = vi.fn().mockImplementation(() => {
+      CallCount++
+      return Promise.resolve(CallCount <= 1 ? [] : [ExternalPatch])
+    })
+
+    const Persist = {
+      ...makeMockPersistence(),
+      loadPatchesSince: loadPatchesSinceFn,
+    }
+
+    const Engine = new SDS_SyncEngine(TargetStore, { PersistenceProvider:Persist })
+    await Engine.start()
+
+    // trigger enough local changes to hit the 512 KB checkpoint threshold.
+    // after the checkpoint merges the external patch, subsequent local patches
+    // must NOT re-export the external data.
+    const LocalItem = TargetStore.newItemAt(undefined, TargetStore.RootItem)
+    const BigValue  = 'V'.repeat(131_071)
+    for (let i = 0; i < 4; i++) {
+      LocalItem.writeValue(BigValue + i)
+    }
+
+    // let the async checkpoint complete
+    await new Promise((r) => setTimeout(r, 100))
+
+    // now make one more small local change AFTER the checkpoint
+    LocalItem.Label = 'post-checkpoint'
+    await new Promise((r) => setTimeout(r, 50))
+
+    // the last appendPatch call should be a small patch (just the label change),
+    // NOT a huge patch that re-exports the external data
+    const LastCall = Persist.appendPatch.mock.calls.at(-1) as [Uint8Array, number]
+    expect(LastCall[0].byteLength).toBeLessThan(1000) // label change is tiny
+
+    await Engine.stop()
+  })
+
   it('SP-06: network engines prune patches on checkpoint; offline engines do not', async () => {
     // ── offline engine: patches must survive stop() ───────────────────────
     const OfflineStore   = SDS_DataStore.fromScratch()

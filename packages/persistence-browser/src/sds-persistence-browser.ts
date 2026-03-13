@@ -17,7 +17,9 @@
 //   values      keyPath: 'hash'
 //               { hash:string, data:Uint8Array, ref_count:number }
 
-import type { SDS_PersistenceProvider, SDS_PatchSeqNumber } from '@rozek/sds-core'
+import type {
+  SDS_PersistenceProvider, SDS_PatchSeqNumber,
+} from '@rozek/sds-core'
 
 //----------------------------------------------------------------------------//
 //                       Helper — IndexedDB promisification                   //
@@ -98,14 +100,14 @@ export class SDS_BrowserPersistenceProvider implements SDS_PersistenceProvider {
 
 /**** saveSnapshot ****/
 
-  async saveSnapshot (Data:Uint8Array):Promise<void> {
+  async saveSnapshot (Data:Uint8Array, Clock?:SDS_PatchSeqNumber):Promise<void> {
     const DB = await this.#open()
     const Tx = IndexedDBTransaction(DB, ['snapshots'], 'readwrite')
     await IndexedDBRequest<IDBValidKey>(
       Tx.objectStore('snapshots').put({
         storeId: this.#StoreId,
         data:    Data,
-        clock:   Date.now(),
+        clock:   Clock ?? 0,
       })
     )
   }

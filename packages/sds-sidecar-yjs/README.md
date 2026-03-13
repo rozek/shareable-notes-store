@@ -71,7 +71,7 @@ Both positional arguments may also be supplied through environment variables or 
 
 | Option | Description |
 | --- | --- |
-| `--on-auth-error <url>` | Webhook URL to notify when the server rejects the token (uses `--webhook-token` too) |
+| `--on-auth-error <url>` | webhook URL to notify when the server rejects the token (uses `--webhook-token` too) |
 
 ### Reconnect tuning
 
